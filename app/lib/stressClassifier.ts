@@ -1,3 +1,4 @@
+import { calculateAirVpd } from "@/app/lib/farmDecisionService"
 import type { WeatherForecast } from "@/app/lib/weatherService"
 
 export type StressKind = "normal" | "drought" | "flood" | "heat" | "multiple" | "insufficient_data"
@@ -54,7 +55,7 @@ export function classifyStress(input: { zones: ZoneInput[]; weather?: WeatherFor
     return { condition: "insufficient_data", severity: "none", confidence: 0, contributors: ["No valid soil-moisture reading"], lastUpdatedAt: new Date(now).toISOString(), status: "Internet Unavailable", connectivity: "offline", scores: { drought: 0, flood: 0, heat: 0 }, data: { zonesEvaluated: 0, freshZones: 0, coveragePercent: 0, weatherSource: "unavailable" }, details: { moistureTrend: "Unavailable", temperatureVpd: "Unavailable", rainContext: "Unavailable", irrigationContext: "Unavailable", limitation: "Connect a valid soil-moisture reading to assess field stress." } }
   }
 
-  const droughtScores: number[] = [], floodScores: number[] = [], heatScores: number[] = []
+  const droughtScores: number[] = [], floodScores: number[] = [], heatScores: number[] = [], effectiveTemps: number[] = [], effectiveVpds: number[] = []
   const contributors = new Set<string>()
   for (const zone of validZones) {
     const moisture = clamp((zone.dryThreshold - zone.soilMoisture) / Math.max(1, zone.dryThreshold) * 100)
@@ -62,12 +63,18 @@ export function classifyStress(input: { zones: ZoneInput[]; weather?: WeatherFor
     const moistureSlope = slope(zone.soilHistory || [])
     const decline = clamp((-moistureSlope / 1.5) * 100)
     const wetPersistence = (zone.soilHistory || []).filter((v) => v >= zone.wetThreshold).length >= 3 ? 100 : 0
-    const temp = Number(zone.temperature)
-    const humidity = Number(zone.humidity)
-    const vpd = Number(zone.vpd)
+    const useLiveWeather = input.weather?.source === "live"
+    const weatherTemperature = Number(input.weather?.current.temperature)
+    const weatherHumidity = Number(input.weather?.current.humidity)
+    const temp = useLiveWeather && Number.isFinite(weatherTemperature) ? weatherTemperature : Number(zone.temperature)
+    const humidity = useLiveWeather && Number.isFinite(weatherHumidity) ? weatherHumidity : Number(zone.humidity)
+    const localVpd = Number(zone.vpd)
+    const vpd = useLiveWeather && Number.isFinite(temp) && Number.isFinite(humidity) ? calculateAirVpd(temp, humidity) : localVpd
+    if (Number.isFinite(temp)) effectiveTemps.push(temp)
+    if (Number.isFinite(vpd)) effectiveVpds.push(vpd)
     const tempStress = Number.isFinite(temp) ? clamp((temp - 32) / 8 * 100) : 0
     const vpdStress = Number.isFinite(vpd) ? clamp((vpd - 1.2) / 1.2 * 100) : 0
-    const rainEvidence = input.weather && (Number(input.weather.current.precipitation) >= 0.1 || Number(input.weather.derived.totalRain24h) >= 2 || (input.weather.derived.nextRainHours !== null && input.weather.derived.nextRainHours <= 3)) ? 100 : 0
+    const rainEvidence = input.weather?.source === "live" && (Number(input.weather.current.precipitation) >= 0.1 || Number(input.weather.derived.totalRain24h) >= 2 || (input.weather.derived.nextRainHours !== null && input.weather.derived.nextRainHours <= 3)) ? 100 : 0
     const drySoil = zone.soilMoisture < zone.dryThreshold ? 100 : 0
     const drought = clamp(0.40 * moisture + 0.20 * decline + 0.15 * (rainEvidence ? 0 : 100) + 0.15 * Math.max(tempStress, vpdStress) + 0.10 * (zone.cycleActive ? 0 : drySoil))
     const flood = clamp(0.40 * wetness + 0.25 * rainEvidence + 0.20 * wetPersistence + 0.15 * (zone.cycleActive ? 100 : 0))
@@ -81,10 +88,8 @@ export function classifyStress(input: { zones: ZoneInput[]; weather?: WeatherFor
   const moistureValues = validZones.map((z) => z.soilMoisture)
   const averageMoisture = Math.round(avg(moistureValues) || 0)
   const averageMoistureSlope = avg(validZones.map((z) => slope(z.soilHistory || []))) || 0
-  const climateTemps = validZones.map((z) => Number(z.temperature)).filter(Number.isFinite)
-  const climateVpd = validZones.map((z) => Number(z.vpd)).filter(Number.isFinite)
-  const averageTemperature = avg(climateTemps)
-  const averageVpd = avg(climateVpd)
+  const averageTemperature = avg(effectiveTemps)
+  const averageVpd = avg(effectiveVpds)
   const active = [{ kind: "drought" as const, score: drought }, { kind: "flood" as const, score: flood }, { kind: "heat" as const, score: heat }].filter((x) => x.score >= 25).sort((a, b) => b.score - a.score)
   const condition: StressKind = active.length >= 2 && active[0].score >= 50 && active[1].score >= 50 ? "multiple" : active[0]?.kind || "normal"
   const topScore = active[0]?.score || 0
@@ -97,13 +102,13 @@ export function classifyStress(input: { zones: ZoneInput[]; weather?: WeatherFor
   const confidence = Math.round(clamp(0.55 * dataQuality + 0.45 * agreement - (input.weather?.source === "fallback" ? 10 : 0)))
   if (confidence < 40) contributors.add("Limited or stale sensor evidence")
   const status: StressStatus = input.weather?.source === "live" ? "Online Verified" : input.weather ? "Offline Prediction" : "Internet Unavailable"
-  const rainContext = input.weather
+  const rainContext = input.weather?.source === "live"
     ? input.weather.current.precipitation >= 0.1
       ? "Rain reported now"
       : input.weather.derived.nextRainHours != null && input.weather.derived.nextRainHours <= 3
         ? `Rain possible within ~${input.weather.derived.nextRainHours}h`
         : "No meaningful rain expected soon"
-    : "Weather unavailable"
+    : input.weather ? "Offline mode · using local sensors only" : "Weather unavailable"
   const irrigationContext = validZones.some((z) => z.cycleActive)
     ? "Irrigation cycle active"
     : "No irrigation cycle active"
