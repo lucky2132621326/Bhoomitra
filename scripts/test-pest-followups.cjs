@@ -93,6 +93,25 @@ async function post(serviceBody, recordId) {
 
 async function main() {
   reset()
+  const fallback = await post({ modelId: "bhoomitra_pest_classifier_v1", identificationSource: "classifier",
+    primaryPrediction: { label: "Aphids", confidence: 0.87 }, predictions: [{ label: "Aphids", confidence: 0.87 }], detections: [], pressure: null })
+  assert.equal(fallback.summary.primaryPestName, "Aphids")
+  assert.equal(fallback.summary.pressureLevel, "unknown")
+  assert.equal(fallback.advice.pesticide.eligible, false)
+  assert.equal(fallback.observation.result.identificationSource, "classifier")
+  assert.equal(zoneLogic.zoneState(fallback.observation), "unmeasured")
+  assert.equal(records.listPestRecords().length, 1)
+  assertNoConfidence(fallback)
+  const prior = structuredClone(fallback.observation)
+  prior.id = "prior"
+  prior.result.identificationSource = "detector"
+  prior.result.summary.pressureLevel = "high"
+  assert.equal(zoneLogic.zoneTrend(fallback.observation, [fallback.observation, prior]).status, "recheck")
+  assert.equal(zoneLogic.zoneTrend(prior, [prior, fallback.observation]).status, "recheck")
+  for (const label of JSON.parse(fs.readFileSync(path.join(root, "pest_ml_service/models/class_names.json")))) {
+    assert.notEqual(knowledge.getPestKnowledge(label).id, "unknown", label)
+  }
+  reset()
   const baseline = seed()
   const missed = records.savePestFollowUp(baseline.id, followUp(unclear))
   assert.equal(missed.record.status, "needs_recheck")

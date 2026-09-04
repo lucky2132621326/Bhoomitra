@@ -45,7 +45,7 @@ export function attachPestSnapshot(recordId: string, observationId: string, resu
   if (!entry) throw new Error("The pest observation could not be saved.")
   // Whitelist public fields rather than retaining the whole inference response.
   const snapshotResult: PestScanResult = {
-    success: true, detected: result.detected, persisted: true, recordId,
+    success: true, detected: result.detected, identificationSource: result.identificationSource, persisted: true, recordId,
     scan: { ...result.scan, timestamp: entry.timestamp }, image: result.image, summary: result.summary,
     predictions: result.predictions, detections: result.detections, pressure: result.pressure,
     classificationLimit: typeof result.classificationLimit === "string" ? result.classificationLimit : "Counts and pressure describe this photo only, not the whole zone.",

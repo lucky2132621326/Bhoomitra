@@ -4,16 +4,17 @@ import { usePathname } from "next/navigation"
 import LanguageSelector from "@/components/language-selector"
 
 /**
- * The app-wide floating selector. Dashboard routes render their own selector
- * inside the mobile header below 768px, so this one steps aside there to keep
- * it clear of page headings and dialogs.
+ * Public-page selector. Dashboard routes reserve their own toolbar/header
+ * space at every breakpoint so this control never covers page content.
  */
 export default function FloatingLanguageSelector() {
   const pathname = usePathname()
   const insideDashboard = pathname?.startsWith("/dashboard") ?? false
 
+  if (insideDashboard) return null
+
   return (
-    <div className={`fixed right-4 top-4 z-[200] ${insideDashboard ? "hidden md:block" : ""}`}>
+    <div className="fixed right-4 top-4 z-[200]">
       <LanguageSelector />
     </div>
   )

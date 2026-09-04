@@ -284,7 +284,7 @@ export default function SmartSprayWorkbench() {
     <div className="min-h-screen bg-slate-50 p-4 md:p-6">
       <div className="mx-auto max-w-6xl space-y-6">
         {/* Header */}
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div>
             <h1 className="flex items-center gap-3 text-3xl font-black text-slate-900">
               <Zap className="h-8 w-8 text-blue-600" />

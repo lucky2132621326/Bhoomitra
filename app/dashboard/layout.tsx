@@ -313,7 +313,10 @@ export default function DashboardLayout({
                 Margin tracks the sidebar's actual current width so content is
                 never covered, whether the sidebar is collapsed or expanded. */}
             <main className={`min-h-screen min-w-0 flex-1 pt-14 transition-[margin-left] duration-300 ease-out md:pt-0 ${expanded ? "md:ml-72" : "md:ml-20"}`}>
-                <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 sm:py-8 md:px-10 md:py-10">
+                <div className="hidden justify-end border-b border-emerald-100/80 bg-white/80 px-6 py-3 md:flex">
+                    <LanguageSelector align="right" />
+                </div>
+                <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 sm:py-8 xl:px-10 xl:py-10">
                     {children}
                 </div>
             </main>

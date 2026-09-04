@@ -8,9 +8,11 @@ import { usePestText } from "@/components/pest-zone-copy"
 import { zoneState, zoneTrend, type PestZoneObservation, type PestZoneState, type PestZoneTrend } from "@/lib/pest-zone-types"
 
 export const zoneLabels: Record<PestZoneState, string> = {
+  unmeasured: "Pressure unknown",
   high: "High alert", moderate: "Moderate", low: "Low", clear: "Field checked: clear", recheck: "Needs recheck", untested: "Not checked",
 }
 export const zoneColours: Record<PestZoneState, string> = {
+  unmeasured: "bg-purple-600 text-white border-purple-700",
   high: "bg-red-600 text-white border-red-700",
   moderate: "bg-orange-500 text-slate-950 border-orange-600",
   low: "bg-yellow-300 text-slate-950 border-yellow-400",
@@ -37,6 +39,7 @@ export function PestZoneResult({ observation, observations, onRetake, onView, on
   const [photoFailed, setPhotoFailed] = useState(false)
   const [fieldChecked, setFieldChecked] = useState(false)
   const result = observation.result
+  const classifierOnly = result.identificationSource === "classifier"
   const trend = zoneTrend(observation, observations)
   const state = zoneState(observation)
   const latest = observations[0]?.id === observation.id
@@ -65,21 +68,22 @@ export function PestZoneResult({ observation, observations, onRetake, onView, on
           {!!result.image.width && !!result.image.height && !!result.detections.length && <svg aria-hidden="true" className="pointer-events-none absolute inset-0 h-full w-full" viewBox={`0 0 ${result.image.width} ${result.image.height}`} preserveAspectRatio="xMidYMid meet">
             {result.detections.map((detection, index) => <rect key={index} x={detection.box.x1} y={detection.box.y1} width={detection.box.width} height={detection.box.height} fill="rgba(22,163,74,.08)" stroke="#16a34a" strokeWidth="3" vectorEffect="non-scaling-stroke" />)}
           </svg>}
-          <p className="absolute bottom-2 left-2 right-2 rounded-xl bg-black/75 px-3 py-2 text-sm text-white">{text(result.detected ? "Green boxes mark visible pests." : "No reliable identification from this photo.")}</p>
+          <p className="absolute bottom-2 left-2 right-2 rounded-xl bg-black/75 px-3 py-2 text-sm text-white">{text(classifierOnly ? "Classifier result — location and count unavailable." : result.detected ? "Green boxes mark visible pests." : "No reliable identification from this photo.")}</p>
         </> : <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center text-slate-500"><ImageOff className="h-9 w-9" /><p>{text(photoFailed ? "Saved photo could not be loaded." : "Photo was not saved for this older test.")}</p></div>}
       </div>
       <div className="flex flex-col justify-center">
         <span className={`w-fit rounded-full border px-3 py-1 text-sm font-bold ${zoneColours[state]}`}>{text(zoneLabels[state])}</span>
         {result.detected && result.summary ? <>
-          <p className="mt-5 text-sm font-bold uppercase tracking-widest text-green-700">{text("Detected pest")}</p>
+          <p className="mt-5 text-sm font-bold uppercase tracking-widest text-green-700">{text(classifierOnly ? "Classifier result" : "Detected pest")}</p>
           <h3 className="mt-1 text-3xl font-extrabold text-slate-950">{text(result.summary.primaryPestName)}</h3>
           <p className="mt-1 italic text-slate-500">{result.summary.scientificName}</p>
-          <div className="my-5 grid grid-cols-2 gap-3">
+          {!classifierOnly && <><div className="my-5 grid grid-cols-2 gap-3">
             <div className="rounded-2xl bg-green-50 p-4"><strong className="block text-3xl text-green-800">{result.summary.visibleCount}</strong><span>{text("visible in this photo")}</span></div>
             <div className="rounded-2xl bg-slate-50 p-4"><strong className="block text-xl">{text(zoneLabels[state])}</strong><span>{text("photo-level pressure")}</span></div>
           </div>
           <div className="flex flex-wrap gap-2">{result.predictions.map((pest) => <Badge key={pest.pestId} variant="outline" className="text-sm">{text(pest.pestName)}: {pest.count}</Badge>)}</div>
-          <p className="mt-4 leading-7 text-slate-600">{text("Counts and pressure describe this photo only, not the whole zone.")}</p>
+          <p className="mt-4 leading-7 text-slate-600">{text("Counts and pressure describe this photo only, not the whole zone.")}</p></>}
+          {classifierOnly && <p className="my-5 rounded-2xl bg-purple-50 p-4 leading-7 text-purple-900">{text("Pest count and pressure are unavailable. Take a closer photo to measure visible pests.")}</p>}
           <Button variant="outline" onClick={speak} className="mt-4 h-11 rounded-xl text-base"><Volume2 className="mr-2 h-5 w-5" />{text("Listen to advice")}</Button>
         </> : <>
           <h3 className="mt-4 text-2xl font-bold">{text(observation.fieldNoPestsAt ? "Farmer checked the plants and reported no visible pests." : "No reliable identification from this photo.")}</h3>
@@ -129,7 +133,7 @@ export function PestZoneResult({ observation, observations, onRetake, onView, on
     <section className="rounded-3xl border border-slate-200 bg-white p-5 sm:p-6">
       <h3 className="flex items-center gap-3 text-2xl font-bold"><History className="text-green-700" />{text("Zone test history")}</h3><p className="mt-2 text-slate-600">{text("Open any test to view its saved result.")}</p>
       <div className="mt-4 max-h-72 space-y-2 overflow-y-auto">{observations.map((item) => <button type="button" key={item.id} onClick={() => onView(item.id)} aria-current={observation.id === item.id ? "true" : undefined} className={`flex w-full flex-wrap items-center justify-between gap-3 rounded-xl border p-4 text-left transition hover:bg-green-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-700 ${item.id === observation.id ? "border-green-600 bg-green-50" : "border-slate-200"}`}>
-        <div><time className="block font-semibold">{date(item.result.scan.timestamp)}</time><span className="text-sm text-slate-600">{text(item.result.scan.crop)} · {text(item.result.summary?.primaryPestName || "Needs recheck")}{item.result.detected ? ` · ${item.result.summary?.visibleCount} ${text("visible")}` : ""}</span></div>
+        <div><time className="block font-semibold">{date(item.result.scan.timestamp)}</time><span className="text-sm text-slate-600">{text(item.result.scan.crop)} · {text(item.result.summary?.primaryPestName || "Needs recheck")}{item.result.detected && item.result.identificationSource !== "classifier" ? ` · ${item.result.summary?.visibleCount} ${text("visible")}` : ""}</span></div>
         <span className={`rounded-full border px-3 py-1 text-sm font-bold ${zoneColours[zoneState(item)]}`}>{text(zoneLabels[zoneState(item)])}</span>
       </button>)}</div>
     </section>

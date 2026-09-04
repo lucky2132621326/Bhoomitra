@@ -437,7 +437,7 @@ export default function Recommendations() {
     <div className="min-h-screen bg-background p-4 md:p-6">
       <div className="mx-auto max-w-7xl space-y-6">
         {/* Header */}
-        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div>
             <h1 className="flex items-center gap-3 text-3xl font-black text-[#1a2e1d]">
               <Brain className="h-8 w-8 text-green-600" />

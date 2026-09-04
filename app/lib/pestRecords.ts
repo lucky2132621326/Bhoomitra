@@ -34,7 +34,7 @@ export type PestFollowUp = {
   confidence: number
   visibleCount: number
   boxCoverageRatio: number
-  pressureLevel: "low" | "moderate" | "high" | "none"
+  pressureLevel: "low" | "moderate" | "high" | "none" | "unknown"
   comparison: FollowUpComparison
   countChangePercent: number | null
   coverageChangePercent: number | null
@@ -60,7 +60,7 @@ export type PestRecord = {
   imageHeight: number
   visibleCount: number
   boxCoverageRatio: number
-  pressureLevel: "none" | "low" | "moderate" | "high"
+  pressureLevel: "none" | "low" | "moderate" | "high" | "unknown"
   imageName: string | null
   timestamp: string
   modelId: string | null
@@ -117,6 +117,10 @@ function percentageChange(current: number, previous: number, floor: number) {
 
 function compareFollowUp(record: PestRecord, input: NewPestFollowUp) {
   const previous = latestMetrics(record)
+  const latest = record.followUps?.at(-1) || record
+  if (input.pressureLevel === "unknown" || latest.pressureLevel === "unknown") {
+    return { previous, comparison: "needs_recheck" as const, countChangePercent: null, coverageChangePercent: null }
+  }
   if (!input.pestId || input.visibleCount === 0) {
     return { previous, comparison: "needs_recheck" as const, countChangePercent: null, coverageChangePercent: null }
   }
@@ -136,7 +140,7 @@ function compareFollowUp(record: PestRecord, input: NewPestFollowUp) {
 
 export function listPestRecords() {
   return [...(readDB().pestDetections || [])]
-    .filter((record) => !record.sample && record.modelId === "bhoomitra_pest_detector_yolo26_v1")
+    .filter((record) => !record.sample && (record.modelId === "bhoomitra_pest_detector_yolo26_v1" || (record.modelId === "bhoomitra_pest_classifier_v1" && record.pressureLevel === "unknown")))
     .sort((a, b) => Date.parse(String(b.timestamp || "")) - Date.parse(String(a.timestamp || ""))) as PestRecord[]
 }
 

@@ -77,13 +77,37 @@ class RetryTests(unittest.TestCase):
         self.image.save(image_bytes, format="JPEG", exif=exif)
         image_bytes.seek(0)
         model = FakeModel([self.empty, self.empty])
-        with patch("main.load_detector", return_value=(model, ["aphids"])), patch("main.active_config", return_value=CONFIG):
+        with patch("main.load_detector", return_value=(model, ["aphids"])), patch("main.active_config", return_value=CONFIG), patch("main.classifier_fallback", return_value=None):
             response = app.test_client().post("/predict", data={"file": (image_bytes, "rotated.jpg")})
         self.assertEqual(response.status_code, 200)
         body = response.get_json()
         self.assertFalse(body["detected"])
         self.assertEqual(body["image"], {"width": 60, "height": 40})
         self.assertEqual(body["inference"]["attemptedSizes"], [640, 1280])
+
+    def test_classifier_result_has_no_boxes_or_pressure(self):
+        image_bytes = BytesIO()
+        self.image.save(image_bytes, format="PNG")
+        image_bytes.seek(0)
+        model = FakeModel([self.empty, self.empty])
+        prediction = {"classId": 1, "label": "Aphids", "confidence": 0.87}
+        with patch("main.load_detector", return_value=(model, ["aphids"])), patch("main.active_config", return_value=CONFIG), patch("main.classifier_fallback", return_value=prediction):
+            body = app.test_client().post("/predict", data={"file": (image_bytes, "test.png")}).get_json()
+        self.assertTrue(body["detected"])
+        self.assertEqual(body["identificationSource"], "classifier")
+        self.assertEqual(body["primaryPrediction"]["label"], "Aphids")
+        self.assertEqual(body["detections"], [])
+        self.assertIsNone(body["pressure"])
+
+    def test_missing_classifier_keeps_scan_inconclusive(self):
+        image_bytes = BytesIO()
+        self.image.save(image_bytes, format="PNG")
+        image_bytes.seek(0)
+        model = FakeModel([self.empty, self.empty])
+        with patch("main.load_detector", return_value=(model, ["aphids"])), patch("main.active_config", return_value=CONFIG), patch("main.classifier_fallback", side_effect=FileNotFoundError("missing")):
+            body = app.test_client().post("/predict", data={"file": (image_bytes, "test.png")}).get_json()
+        self.assertFalse(body["detected"])
+        self.assertIsNone(body["pressure"])
 
 
 if __name__ == "__main__":

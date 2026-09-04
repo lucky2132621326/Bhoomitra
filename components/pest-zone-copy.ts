@@ -5,6 +5,10 @@ import { useLanguage } from "@/lib/language-context"
 import { getPestPhraseMap } from "@/lib/pest-phrase-map"
 
 const hindi: Record<string, string> = {
+  "Pressure unknown": "कीट दबाव अज्ञात",
+  "Classifier result": "वर्गीकरण मॉडल का नतीजा",
+  "Classifier result — location and count unavailable.": "वर्गीकरण का नतीजा — स्थान और गिनती उपलब्ध नहीं हैं।",
+  "Pest count and pressure are unavailable. Take a closer photo to measure visible pests.": "कीटों की गिनती और दबाव उपलब्ध नहीं हैं। गिनती के लिए और नज़दीक से फोटो लें।",
   "Do not repeat the same IRAC group or spray from old leaf damage alone.": "एक ही IRAC समूह का बार-बार उपयोग न करें और केवल पुरानी पत्ती की क्षति देखकर छिड़काव न करें।",
   "Rotate IRAC groups and treat new activity, not old deadhearts or whiteheads.": "IRAC समूह बदलते रहें और नई कीट गतिविधि का उपचार करें, केवल पुराने सूखे मध्य अंकुर या सफेद बालियों का नहीं।",
   "Rotate IRAC groups and avoid resurgence-causing calendar applications.": "IRAC समूह बदलते रहें और केवल तय तारीख के अनुसार ऐसे छिड़काव से बचें जिनसे कीट फिर बढ़ सकते हैं।",
