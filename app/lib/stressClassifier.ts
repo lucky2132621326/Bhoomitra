@@ -13,6 +13,7 @@ export type StressResult = {
   status: StressStatus
   connectivity: "online" | "offline" | "checking"
   scores: { drought: number; flood: number; heat: number }
+  data: { zonesEvaluated: number; freshZones: number; coveragePercent: number; weatherSource: string }
 }
 
 type ZoneInput = {
@@ -49,7 +50,7 @@ export function classifyStress(input: { zones: ZoneInput[]; weather?: WeatherFor
   const validZones = input.zones.filter((z) => Number.isFinite(z.soilMoisture) && !z.sensorError)
   const freshCount = validZones.filter((z) => z.sensorFresh !== false).length
   if (!validZones.length) {
-    return { condition: "insufficient_data", severity: "none", confidence: 0, contributors: ["No valid soil-moisture reading"], lastUpdatedAt: new Date(now).toISOString(), status: "Internet Unavailable", connectivity: "offline", scores: { drought: 0, flood: 0, heat: 0 } }
+    return { condition: "insufficient_data", severity: "none", confidence: 0, contributors: ["No valid soil-moisture reading"], lastUpdatedAt: new Date(now).toISOString(), status: "Internet Unavailable", connectivity: "offline", scores: { drought: 0, flood: 0, heat: 0 }, data: { zonesEvaluated: 0, freshZones: 0, coveragePercent: 0, weatherSource: "unavailable" } }
   }
 
   const droughtScores: number[] = [], floodScores: number[] = [], heatScores: number[] = []
@@ -79,10 +80,14 @@ export function classifyStress(input: { zones: ZoneInput[]; weather?: WeatherFor
   const active = [{ kind: "drought" as const, score: drought }, { kind: "flood" as const, score: flood }, { kind: "heat" as const, score: heat }].filter((x) => x.score >= 25).sort((a, b) => b.score - a.score)
   const condition: StressKind = active.length >= 2 && active[0].score >= 50 && active[1].score >= 50 ? "multiple" : active[0]?.kind || "normal"
   const topScore = active[0]?.score || 0
-  const dataQuality = clamp((freshCount / validZones.length) * 100)
+  // The prototype has one physical soil probe feeding a representative zone;
+  // one fresh probe is therefore meaningful evidence, while coverage is still
+  // shown separately so confidence is not falsely presented as whole-farm certainty.
+  const coveragePercent = Math.round((freshCount / validZones.length) * 100)
+  const dataQuality = freshCount > 0 ? 60 + Math.min(40, coveragePercent * 0.4) : 25
   const agreement = active.length ? clamp(topScore + (active[0].score >= 50 ? 10 : 0)) : 75
   const confidence = Math.round(clamp(0.55 * dataQuality + 0.45 * agreement - (input.weather?.source === "fallback" ? 10 : 0)))
   if (confidence < 40) contributors.add("Limited or stale sensor evidence")
   const status: StressStatus = input.weather?.source === "live" ? "Online Verified" : input.weather ? "Offline Prediction" : "Internet Unavailable"
-  return { condition, severity: severity(topScore), confidence, contributors: [...contributors].slice(0, 4), lastUpdatedAt: new Date(now).toISOString(), status, connectivity: status === "Online Verified" ? "online" : status === "Internet Unavailable" ? "offline" : "checking", scores: { drought, flood, heat } }
+  return { condition, severity: severity(topScore), confidence, contributors: [...contributors].slice(0, 4), lastUpdatedAt: new Date(now).toISOString(), status, connectivity: status === "Online Verified" ? "online" : status === "Internet Unavailable" ? "offline" : "checking", scores: { drought, flood, heat }, data: { zonesEvaluated: validZones.length, freshZones: freshCount, coveragePercent, weatherSource: input.weather?.source || "unavailable" } }
 }

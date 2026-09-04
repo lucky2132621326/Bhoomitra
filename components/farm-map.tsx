@@ -1023,6 +1023,7 @@ export default function FarmMap() {
                           <span><strong>Condition:</strong> {stress.condition}</span>
                           <span><strong>Severity:</strong> {stress.severity}</span>
                           <span><strong>Connectivity:</strong> {isOnline ? stress.connectivity : "offline"}</span>
+                          <span><strong>Coverage:</strong> {stress.data.coveragePercent}% ({stress.data.freshZones}/{stress.data.zonesEvaluated} zones)</span>
                           <span><strong>Updated:</strong> {new Date(stress.lastUpdatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
                         </div>
                         <p className="mt-2"><strong>Scores:</strong> drought {stress.scores.drought}/100 · flood {stress.scores.flood}/100 · heat {stress.scores.heat}/100</p>
