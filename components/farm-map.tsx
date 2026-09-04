@@ -29,7 +29,6 @@ import {
   Sun,
   Cloud,
   ChevronDown,
-  ChevronUp,
 } from "lucide-react"
 import HardwareSafetyPanel from "@/components/hardware-safety-panel"
 import FarmLocationPicker from "@/components/farm-location-picker"
@@ -1009,34 +1008,51 @@ export default function FarmMap() {
 
                     <button
                       type="button"
-                      onClick={() => setStressExpanded((open) => !open)}
+                      onClick={() => setStressExpanded(true)}
                       className="mt-2 flex w-full items-center justify-between rounded-lg border border-sky-100 bg-white px-3 py-2 text-left text-xs font-semibold text-sky-800 hover:bg-sky-50"
-                      aria-expanded={stressExpanded}
+                      aria-haspopup="dialog"
                     >
                       <span>{stressStatus} · confidence {stress?.confidence ?? 0}%</span>
-                      {stressExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                      <ChevronDown className="h-4 w-4" />
                     </button>
 
-                    {stressExpanded && stress && (
-                      <div className="mt-2 rounded-lg border border-sky-100 bg-white p-3 text-xs text-slate-600">
-                        <div className="flex flex-wrap gap-x-4 gap-y-1">
-                          <span><strong>Condition:</strong> {stress.condition}</span>
-                          <span><strong>Severity:</strong> {stress.severity}</span>
-                          <span><strong>Connectivity:</strong> {isOnline ? stress.connectivity : "offline"}</span>
-                          <span><strong>Coverage:</strong> {stress.data.coveragePercent}% ({stress.data.freshZones}/{stress.data.zonesEvaluated} zones)</span>
-                          <span><strong>Updated:</strong> {new Date(stress.lastUpdatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
-                        </div>
-                        <p className="mt-2"><strong>Scores:</strong> drought {stress.scores.drought}/100 · flood {stress.scores.flood}/100 · heat {stress.scores.heat}/100</p>
-                        <div className="mt-2 grid gap-1 sm:grid-cols-2">
-                          <span><strong>Moisture trend:</strong> {stress.details.moistureTrend}</span>
-                          <span><strong>Temperature/VPD:</strong> {stress.details.temperatureVpd}</span>
-                          <span><strong>Rain context:</strong> {stress.details.rainContext}</span>
-                          <span><strong>Irrigation:</strong> {stress.details.irrigationContext}</span>
-                        </div>
-                        <p className="mt-1"><strong>Signals:</strong> {stress.contributors.length ? stress.contributors.join(" · ") : "No elevated stress signals"}</p>
-                        {stress.details.limitation && <p className="mt-1 text-amber-700"><strong>Limitation:</strong> {stress.details.limitation}</p>}
-                      </div>
-                    )}
+                    <Dialog open={stressExpanded} onOpenChange={setStressExpanded}>
+                      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+                        <DialogHeader>
+                          <DialogTitle className="flex items-center gap-2"><AlertTriangle className="h-5 w-5 text-amber-600" /> Field stress risk details</DialogTitle>
+                          <DialogDescription>Evidence-based local assessment using the connected farm sensors, zone history, irrigation activity, and Regional Weather API.</DialogDescription>
+                        </DialogHeader>
+                        {stress && (
+                          <div className="space-y-4 text-sm text-slate-700">
+                            <div className="grid gap-2 sm:grid-cols-4">
+                              <div className="rounded-lg border border-sky-100 bg-sky-50 p-3"><p className="text-[10px] font-bold uppercase text-sky-700">Condition</p><p className="mt-1 text-lg font-black">{stress.condition}</p></div>
+                              <div className="rounded-lg border border-sky-100 bg-sky-50 p-3"><p className="text-[10px] font-bold uppercase text-sky-700">Severity</p><p className="mt-1 text-lg font-black">{stress.severity}</p></div>
+                              <div className="rounded-lg border border-sky-100 bg-sky-50 p-3"><p className="text-[10px] font-bold uppercase text-sky-700">Confidence</p><p className="mt-1 text-lg font-black">{stress.confidence}%</p></div>
+                              <div className="rounded-lg border border-sky-100 bg-sky-50 p-3"><p className="text-[10px] font-bold uppercase text-sky-700">Status</p><p className="mt-1 text-sm font-black">{isOnline ? stress.status : "Internet Unavailable"}</p></div>
+                            </div>
+                            <div className="rounded-xl border border-slate-200 p-4">
+                              <h3 className="font-black text-slate-900">Risk factors</h3>
+                              <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                                {[
+                                  ["Drought", stress.scores.drought, "Low soil moisture, drying trend, high evaporative demand, and absent rainfall."],
+                                  ["Flood / excess water", stress.scores.flood, "Wet soil, rainfall, persistent saturation, and recent irrigation activity."],
+                                  ["Heat stress", stress.scores.heat, "High temperature, VPD, duration of heat, and dry-soil amplification."],
+                                ].map(([name, score, explanation]) => <div key={String(name)} className="rounded-lg bg-slate-50 p-3"><div className="flex items-center justify-between"><span className="font-bold">{name}</span><span className="font-black">{score}/100</span></div><p className="mt-1 text-xs leading-5 text-slate-600">{explanation}</p></div>)}
+                              </div>
+                            </div>
+                            <div className="grid gap-2 rounded-xl border border-slate-200 p-4 sm:grid-cols-2">
+                              <p><strong>Moisture trend:</strong> {stress.details.moistureTrend}</p>
+                              <p><strong>Temperature/VPD:</strong> {stress.details.temperatureVpd}</p>
+                              <p><strong>Rain context:</strong> {stress.details.rainContext}</p>
+                              <p><strong>Irrigation:</strong> {stress.details.irrigationContext}</p>
+                              <p><strong>Sensor coverage:</strong> {stress.data.coveragePercent}% ({stress.data.freshZones}/{stress.data.zonesEvaluated} zones)</p>
+                              <p><strong>Last update:</strong> {new Date(stress.lastUpdatedAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}</p>
+                            </div>
+                            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4"><p><strong>Contributing parameters:</strong> {stress.contributors.length ? stress.contributors.join(" · ") : "No elevated stress signals"}</p>{stress.details.limitation && <p className="mt-2"><strong>Limitation:</strong> {stress.details.limitation}</p>}</div>
+                          </div>
+                        )}
+                      </DialogContent>
+                    </Dialog>
 
                     {/* Spray advisory — full width, same grid alignment, grows to fill remaining height */}
                     <div className="mt-2.5 flex flex-1 flex-col justify-center rounded-lg border border-sky-100 bg-white p-3">
