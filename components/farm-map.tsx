@@ -481,6 +481,9 @@ export default function FarmMap() {
   const mapZoneCount = visibleZones.length || farmProfile.zones
   const columns = Math.min(Math.max(mapZoneCount, 1), 6)
   const rows = Math.max(1, Math.ceil(mapZoneCount / Math.max(columns, 1)))
+  const selectedStressLabel = selectedStress === "overall" ? "All risk factors" : `${selectedStress[0].toUpperCase()}${selectedStress.slice(1)} stress`
+  const selectedStressScore = stress && selectedStress !== "overall" ? stress.scores[selectedStress] : null
+  const selectedStressSeverity = selectedStressScore == null ? stress?.severity : selectedStressScore >= 75 ? "high" : selectedStressScore >= 50 ? "moderate" : selectedStressScore >= 25 ? "low" : "none"
   const activeDiseaseZones = visibleZones
     .filter((zone) => Boolean(zone.disease) && zone.activeDetection)
     .sort((a, b) => (b.severityScore ?? 0) - (a.severityScore ?? 0) || (b.mlConfidence ?? 0) - (a.mlConfidence ?? 0))
@@ -993,7 +996,7 @@ export default function FarmMap() {
                       {[
                         {
                           label: "Field Stress",
-                          value: stress?.condition === "multiple" ? "Multiple" : stress?.condition === "insufficient_data" ? "Insufficient data" : stress?.condition ? stress.condition[0].toUpperCase() + stress.condition.slice(1) : "Checking",
+                          value: stress ? "View risks" : "Checking",
                           icon: <AlertTriangle className="h-3.5 w-3.5" />,
                           tone: stress?.severity === "high" ? "text-red-700" : stress?.severity === "moderate" ? "text-amber-700" : "text-slate-900",
                         },
@@ -1026,17 +1029,17 @@ export default function FarmMap() {
                         {stress && (
                           <div className="space-y-4 text-sm text-slate-700">
                           <div className="grid gap-2 sm:grid-cols-3">
-                              <div className="rounded-lg border border-sky-100 bg-sky-50 p-3"><p className="text-[10px] font-bold uppercase text-sky-700">Condition</p><p className="mt-1 text-lg font-black">{stress.condition}</p></div>
-                              <div className="rounded-lg border border-sky-100 bg-sky-50 p-3"><p className="text-[10px] font-bold uppercase text-sky-700">Severity</p><p className="mt-1 text-lg font-black">{stress.severity}</p></div>
+                              <div className="rounded-lg border border-sky-100 bg-sky-50 p-3"><p className="text-[10px] font-bold uppercase text-sky-700">Condition</p><p className="mt-1 text-lg font-black">{selectedStressLabel}</p></div>
+                              <div className="rounded-lg border border-sky-100 bg-sky-50 p-3"><p className="text-[10px] font-bold uppercase text-sky-700">Severity</p><p className="mt-1 text-lg font-black">{selectedStressSeverity}</p></div>
                               <div className="rounded-lg border border-sky-100 bg-sky-50 p-3"><p className="text-[10px] font-bold uppercase text-sky-700">Mode</p><p className="mt-1 text-sm font-black">{isOnline ? "Online" : "Offline"}</p></div>
                             </div>
                             <div className="rounded-xl border border-slate-200 p-4">
                               <h3 className="font-black text-slate-900">{selectedStress === "overall" ? "Risk factors" : `${selectedStress[0].toUpperCase()}${selectedStress.slice(1)} risk factors`}</h3>
                               <div className="mt-3 grid gap-3 sm:grid-cols-3">
                                 {[
-                                  ["Drought", stress.scores.drought, "Low soil moisture, drying trend, high evaporative demand, and absent rainfall."],
-                                  ["Flood / excess water", stress.scores.flood, "Wet soil, rainfall, persistent saturation, and recent irrigation activity."],
-                                  ["Heat stress", stress.scores.heat, "High temperature, VPD, duration of heat, and dry-soil amplification."],
+                                  ["Drought", stress.scores.drought, "Signals: low soil moisture, drying trend, high evaporative demand, or absent rainfall. Effect: wilting, poor nutrient uptake, flower/fruit drop, and yield loss."],
+                                  ["Flood / excess water", stress.scores.flood, "Signals: wet soil, rainfall, persistent saturation, or recent irrigation. Effect: oxygen-starved roots, root disease, nutrient leaching, and plant yellowing."],
+                                  ["Heat stress", stress.scores.heat, "Signals: high temperature, VPD, heat duration, and dry-soil amplification. Effect: excess water loss, leaf scorching/rolling, pollen failure, and smaller yields."],
                                 ].map(([name, score, explanation]) => {
                                   const key = String(name).split(" ")[0].toLowerCase() as "drought" | "flood" | "heat"
                                   const selected = selectedStress === key
