@@ -1024,17 +1024,21 @@ export default function FarmMap() {
                       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
                         <DialogHeader>
                           <DialogTitle className="flex items-center gap-2"><AlertTriangle className="h-5 w-5 text-amber-600" /> {selectedStress === "overall" ? "Field stress risk details" : `${selectedStress[0].toUpperCase()}${selectedStress.slice(1)} stress details`}</DialogTitle>
-                          <DialogDescription>Evidence-based local assessment using the connected farm sensors, zone history, irrigation activity, and Regional Weather API.</DialogDescription>
+                          <DialogDescription>Evidence-based assessment for {farmLocationLabel || "your farm"}, using connected sensors, zone history, irrigation activity, and the Regional Weather API.</DialogDescription>
                         </DialogHeader>
                         {stress && (
                           <div className="space-y-4 text-sm text-slate-700">
+                            <div className="flex items-center justify-between rounded-xl border border-sky-100 bg-gradient-to-r from-sky-50 to-emerald-50 px-4 py-3">
+                              <div className="flex items-center gap-2"><MapPin className="h-4 w-4 text-sky-700" /><div><p className="text-[10px] font-bold uppercase tracking-wide text-sky-700">Farm location</p><p className="font-black text-slate-900">{farmLocationLabel || "Location not configured"}</p></div></div>
+                              <span className="rounded-full bg-white/80 px-2.5 py-1 text-[10px] font-bold uppercase text-sky-700">{farmWeather?.source === "live" && isOnline ? "Live weather" : "Local estimate"}</span>
+                            </div>
                           <div className="grid gap-2 sm:grid-cols-3">
                               <div className="rounded-lg border border-sky-100 bg-sky-50 p-3"><p className="text-[10px] font-bold uppercase text-sky-700">Condition</p><p className="mt-1 text-lg font-black">{selectedStressLabel}</p></div>
                               <div className="rounded-lg border border-sky-100 bg-sky-50 p-3"><p className="text-[10px] font-bold uppercase text-sky-700">Severity</p><p className="mt-1 text-lg font-black">{selectedStressSeverity}</p></div>
                               <div className="rounded-lg border border-sky-100 bg-sky-50 p-3"><p className="text-[10px] font-bold uppercase text-sky-700">Mode</p><p className="mt-1 text-sm font-black">{isOnline ? "Online" : "Offline"}</p></div>
                             </div>
                             <div className="rounded-xl border border-slate-200 p-4">
-                              <h3 className="font-black text-slate-900">{selectedStress === "overall" ? "Risk factors" : `${selectedStress[0].toUpperCase()}${selectedStress.slice(1)} risk factors`}</h3>
+                              <h3 className="font-black text-slate-900">{selectedStress === "overall" ? "Risk factors" : `${selectedStress[0].toUpperCase()}${selectedStress.slice(1)} risk factors`} <span className="font-normal text-slate-500">· {farmLocationLabel || "your farm"}</span></h3>
                               <div className="mt-3 grid gap-3 sm:grid-cols-3">
                                 {[
                                   ["Drought", stress.scores.drought, "Signals: low soil moisture, drying trend, high evaporative demand, or absent rainfall. Effect: wilting, poor nutrient uptake, flower/fruit drop, and yield loss."],
