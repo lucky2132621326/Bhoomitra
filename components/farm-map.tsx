@@ -1054,7 +1054,7 @@ export default function FarmMap() {
                                       <p className="mt-1 text-xs leading-5 text-slate-600">{String(explanation).split(" Effect:")[0].replace("Signals: ", "")}</p>
                                       <p className="mt-3 text-[10px] font-bold uppercase tracking-wide text-emerald-700">Crop impact</p>
                                       <p className="mt-1 text-xs leading-5 text-slate-600">{String(explanation).split(" Effect: ")[1] || "Monitor the crop and confirm on site."}</p>
-                                      <p className="mt-2 text-[10px] font-bold uppercase tracking-wide text-sky-700">{selected ? "Selected" : "View details"}</p>
+                                      {selected && <p className="mt-2 text-[10px] font-bold uppercase tracking-wide text-sky-700">Selected</p>}
                                     </button>
                                   )
                                 })}
