@@ -1027,7 +1027,14 @@ export default function FarmMap() {
                           <span><strong>Updated:</strong> {new Date(stress.lastUpdatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
                         </div>
                         <p className="mt-2"><strong>Scores:</strong> drought {stress.scores.drought}/100 · flood {stress.scores.flood}/100 · heat {stress.scores.heat}/100</p>
+                        <div className="mt-2 grid gap-1 sm:grid-cols-2">
+                          <span><strong>Moisture trend:</strong> {stress.details.moistureTrend}</span>
+                          <span><strong>Temperature/VPD:</strong> {stress.details.temperatureVpd}</span>
+                          <span><strong>Rain context:</strong> {stress.details.rainContext}</span>
+                          <span><strong>Irrigation:</strong> {stress.details.irrigationContext}</span>
+                        </div>
                         <p className="mt-1"><strong>Signals:</strong> {stress.contributors.length ? stress.contributors.join(" · ") : "No elevated stress signals"}</p>
+                        {stress.details.limitation && <p className="mt-1 text-amber-700"><strong>Limitation:</strong> {stress.details.limitation}</p>}
                       </div>
                     )}
 
