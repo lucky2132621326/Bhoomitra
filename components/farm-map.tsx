@@ -1037,7 +1037,17 @@ export default function FarmMap() {
                                   ["Drought", stress.scores.drought, "Low soil moisture, drying trend, high evaporative demand, and absent rainfall."],
                                   ["Flood / excess water", stress.scores.flood, "Wet soil, rainfall, persistent saturation, and recent irrigation activity."],
                                   ["Heat stress", stress.scores.heat, "High temperature, VPD, duration of heat, and dry-soil amplification."],
-                                ].map(([name, score, explanation]) => <div key={String(name)} className={`rounded-lg p-3 ${selectedStress === String(name).split(" ")[0].toLowerCase() ? "border-2 border-sky-500 bg-sky-50" : "bg-slate-50"}`}><div className="flex items-center justify-between"><span className="font-bold">{name}</span><span className="font-black">{score}/100</span></div><p className="mt-1 text-xs leading-5 text-slate-600">{explanation}</p></div>)}
+                                ].map(([name, score, explanation]) => {
+                                  const key = String(name).split(" ")[0].toLowerCase() as "drought" | "flood" | "heat"
+                                  const selected = selectedStress === key
+                                  return (
+                                    <button key={String(name)} type="button" onClick={() => setSelectedStress(key)} aria-pressed={selected} className={`rounded-lg p-3 text-left transition ${selected ? "border-2 border-sky-500 bg-sky-50 shadow-sm" : "border border-transparent bg-slate-50 hover:border-sky-200 hover:bg-sky-50/60"}`}>
+                                      <div className="flex items-center justify-between"><span className="font-bold">{name}</span><span className="font-black">{score}/100</span></div>
+                                      <p className="mt-1 text-xs leading-5 text-slate-600">{explanation}</p>
+                                      <p className="mt-2 text-[10px] font-bold uppercase tracking-wide text-sky-700">{selected ? "Selected" : "View details"}</p>
+                                    </button>
+                                  )
+                                })}
                               </div>
                             </div>
                             <div className="grid gap-2 rounded-xl border border-slate-200 p-4 sm:grid-cols-2">
