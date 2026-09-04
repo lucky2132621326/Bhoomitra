@@ -1029,8 +1029,8 @@ export default function FarmMap() {
                         {stress && (
                           <div className="space-y-4 text-sm text-slate-700">
                             <div className="flex items-center justify-between rounded-xl border border-sky-100 bg-gradient-to-r from-sky-50 to-emerald-50 px-4 py-3">
-                              <div className="flex items-center gap-2"><MapPin className="h-4 w-4 text-sky-700" /><div><p className="text-[10px] font-bold uppercase tracking-wide text-sky-700">Farm location</p><p className="font-black text-slate-900">{farmLocationLabel || "Location not configured"}</p></div></div>
-                              <span className="rounded-full bg-white/80 px-2.5 py-1 text-[10px] font-bold uppercase text-sky-700">{farmWeather?.source === "live" && isOnline ? "Live weather" : "Local estimate"}</span>
+                              <div className="flex min-w-0 items-center gap-2"><MapPin className="h-4 w-4 shrink-0 text-sky-700" /><div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-wide text-sky-700">Farm location</p><p className="truncate font-black text-slate-900">{farmLocationLabel || "Location not configured"}</p><p className="text-[10px] text-slate-500">{farmProfile.farmLocation?.source === "device" ? "GPS location · precise for this device" : farmProfile.farmLocation?.source === "search" ? "Searched place · area forecast, not field GPS" : "Set a location for local weather"}</p>{farmProfile.farmLocation && <p className="text-[10px] tabular-nums text-slate-500">{farmProfile.farmLocation.latitude.toFixed(4)}, {farmProfile.farmLocation.longitude.toFixed(4)}</p>}</div></div>
+                              <span className="shrink-0 rounded-full bg-white/80 px-2.5 py-1 text-[10px] font-bold uppercase text-sky-700">{farmWeather?.source === "live" && isOnline ? "Live weather" : "Local estimate"}</span>
                             </div>
                           <div className="grid gap-2 sm:grid-cols-3">
                               <div className="rounded-lg border border-sky-100 bg-sky-50 p-3"><p className="text-[10px] font-bold uppercase text-sky-700">Condition</p><p className="mt-1 text-lg font-black">{selectedStressLabel}</p></div>
@@ -1048,9 +1048,12 @@ export default function FarmMap() {
                                   const key = String(name).split(" ")[0].toLowerCase() as "drought" | "flood" | "heat"
                                   const selected = selectedStress === key
                                   return (
-                                    <button key={String(name)} type="button" onClick={() => setSelectedStress(key)} aria-pressed={selected} className={`rounded-lg p-3 text-left transition ${selected ? "border-2 border-sky-500 bg-sky-50 shadow-sm" : "border border-transparent bg-slate-50 hover:border-sky-200 hover:bg-sky-50/60"}`}>
+                                    <button key={String(name)} type="button" onClick={() => setSelectedStress(key)} aria-pressed={selected} className={`min-h-44 rounded-xl p-4 text-left transition ${selected ? "border-2 border-sky-500 bg-sky-50 shadow-sm" : "border border-slate-200 bg-white hover:border-sky-300 hover:bg-sky-50/60"}`}>
                                       <div className="flex items-center justify-between"><span className="font-bold">{name}</span><span className="font-black">{score}/100</span></div>
-                                      <p className="mt-1 text-xs leading-5 text-slate-600">{explanation}</p>
+                                      <p className="mt-3 text-[10px] font-bold uppercase tracking-wide text-sky-700">What we’re seeing</p>
+                                      <p className="mt-1 text-xs leading-5 text-slate-600">{String(explanation).split(" Effect:")[0].replace("Signals: ", "")}</p>
+                                      <p className="mt-3 text-[10px] font-bold uppercase tracking-wide text-emerald-700">Crop impact</p>
+                                      <p className="mt-1 text-xs leading-5 text-slate-600">{String(explanation).split(" Effect: ")[1] || "Monitor the crop and confirm on site."}</p>
                                       <p className="mt-2 text-[10px] font-bold uppercase tracking-wide text-sky-700">{selected ? "Selected" : "View details"}</p>
                                     </button>
                                   )
