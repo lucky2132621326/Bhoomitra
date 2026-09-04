@@ -28,6 +28,8 @@ import {
   CloudRain,
   Sun,
   Cloud,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react"
 import HardwareSafetyPanel from "@/components/hardware-safety-panel"
 import FarmLocationPicker from "@/components/farm-location-picker"
@@ -36,6 +38,7 @@ import { getIrrigationPulsePlan, isDemoControlZone, MAX_IRRIGATION_PULSES, PUMP_
 import { estimatePulseLitres, FLOW_CALIBRATED } from "@/app/lib/flowModel"
 import { interpretDetection, toneColor } from "@/app/lib/diseaseLanguage"
 import { useTranslation, usePluralTranslation } from "@/lib/use-translation"
+import type { StressResult } from "@/app/lib/stressClassifier"
 
 
 import { useFarmStore } from "@/store/farmStore"
@@ -151,6 +154,7 @@ interface ZonesApiResponse {
   farmClimate?: FarmClimate
   climatePresentation?: FarmClimatePresentation
   weather?: FarmWeather | null
+  stress?: StressResult
   irrigation: {
     dryThreshold: number
     wetThreshold: number
@@ -302,6 +306,9 @@ export default function FarmMap() {
   const [farmClimate, setFarmClimate] = useState<FarmClimate | null>(null)
   const [climatePresentation, setClimatePresentation] = useState<FarmClimatePresentation | null>(null)
   const [farmWeather, setFarmWeather] = useState<FarmWeather | null>(null)
+  const [stress, setStress] = useState<StressResult | null>(null)
+  const [stressExpanded, setStressExpanded] = useState(false)
+  const [isOnline, setIsOnline] = useState(true)
   const [waterSummary, setWaterSummary] = useState<{
     calibrated: boolean
     season: { totalLitres: number; irrigationLitres: number; sprayLitres: number; commandCount: number }
@@ -350,6 +357,7 @@ export default function FarmMap() {
       setFarmClimate(parsed.farmClimate || null)
       setClimatePresentation(parsed.climatePresentation || null)
       setFarmWeather(parsed.weather || null)
+      setStress(parsed.stress || null)
 
       // Live water intelligence (season totals + targeted-vs-broadcast saving).
       fetch("/api/water-summary")
@@ -444,6 +452,11 @@ export default function FarmMap() {
   }
 
   useEffect(() => {
+    setIsOnline(typeof navigator === "undefined" ? true : navigator.onLine)
+    const handleOnline = () => setIsOnline(true)
+    const handleOffline = () => setIsOnline(false)
+    window.addEventListener("online", handleOnline)
+    window.addEventListener("offline", handleOffline)
     fetchFarmerProfile()
     fetchZones()
     fetchAnalytics()
@@ -454,11 +467,15 @@ export default function FarmMap() {
     const leverageInterval = setInterval(fetchZoneLeverage, 30000)
 
     return () => {
+      window.removeEventListener("online", handleOnline)
+      window.removeEventListener("offline", handleOffline)
       clearInterval(zoneInterval)
       clearInterval(analyticsInterval)
       clearInterval(leverageInterval)
     }
   }, [])
+
+  const stressStatus = !isOnline ? "Internet Unavailable" : stress?.status || "Checking local stress conditions"
 
   // The map is always rendered from the API's real zone graph. This prevents
   // profile defaults or stale configuration from silently hiding A6/B6.
@@ -973,6 +990,45 @@ export default function FarmMap() {
                         value={farmWeather.fetchedAt ? new Date(farmWeather.fetchedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}
                       />
                     </div>
+
+                    <div className="mt-2.5 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+                      {[
+                        {
+                          label: "Field Stress",
+                          value: stress?.condition === "multiple" ? "Multiple" : stress?.condition === "insufficient_data" ? "Insufficient data" : stress?.condition ? stress.condition[0].toUpperCase() + stress.condition.slice(1) : "Checking",
+                          icon: <AlertTriangle className="h-3.5 w-3.5" />,
+                          tone: stress?.severity === "high" ? "text-red-700" : stress?.severity === "moderate" ? "text-amber-700" : "text-slate-900",
+                        },
+                        { label: "Drought Risk", value: stress?.scores.drought == null ? "Checking" : stress.scores.drought >= 75 ? "High" : stress.scores.drought >= 50 ? "Moderate" : stress.scores.drought >= 25 ? "Low" : "Normal", icon: <Droplets className="h-3.5 w-3.5" />, tone: (stress?.scores.drought ?? 0) >= 50 ? "text-amber-700" : "text-slate-900" },
+                        { label: "Flood Risk", value: stress?.scores.flood == null ? "Checking" : stress.scores.flood >= 75 ? "High" : stress.scores.flood >= 50 ? "Moderate" : stress.scores.flood >= 25 ? "Low" : "Normal", icon: <CloudRain className="h-3.5 w-3.5" />, tone: (stress?.scores.flood ?? 0) >= 50 ? "text-blue-700" : "text-slate-900" },
+                        { label: "Heat Risk", value: stress?.scores.heat == null ? "Checking" : stress.scores.heat >= 75 ? "High" : stress.scores.heat >= 50 ? "Moderate" : stress.scores.heat >= 25 ? "Low" : "Normal", icon: <Thermometer className="h-3.5 w-3.5" />, tone: (stress?.scores.heat ?? 0) >= 50 ? "text-red-700" : "text-slate-900" },
+                      ].map((tile) => (
+                        <WeatherStatTile key={tile.label} icon={tile.icon} label={tile.label} value={tile.value} tone={tile.tone} />
+                      ))}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setStressExpanded((open) => !open)}
+                      className="mt-2 flex w-full items-center justify-between rounded-lg border border-sky-100 bg-white px-3 py-2 text-left text-xs font-semibold text-sky-800 hover:bg-sky-50"
+                      aria-expanded={stressExpanded}
+                    >
+                      <span>{stressStatus} · confidence {stress?.confidence ?? 0}%</span>
+                      {stressExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    </button>
+
+                    {stressExpanded && stress && (
+                      <div className="mt-2 rounded-lg border border-sky-100 bg-white p-3 text-xs text-slate-600">
+                        <div className="flex flex-wrap gap-x-4 gap-y-1">
+                          <span><strong>Condition:</strong> {stress.condition}</span>
+                          <span><strong>Severity:</strong> {stress.severity}</span>
+                          <span><strong>Connectivity:</strong> {isOnline ? stress.connectivity : "offline"}</span>
+                          <span><strong>Updated:</strong> {new Date(stress.lastUpdatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                        </div>
+                        <p className="mt-2"><strong>Scores:</strong> drought {stress.scores.drought}/100 · flood {stress.scores.flood}/100 · heat {stress.scores.heat}/100</p>
+                        <p className="mt-1"><strong>Signals:</strong> {stress.contributors.length ? stress.contributors.join(" · ") : "No elevated stress signals"}</p>
+                      </div>
+                    )}
 
                     {/* Spray advisory — full width, same grid alignment, grows to fill remaining height */}
                     <div className="mt-2.5 flex flex-1 flex-col justify-center rounded-lg border border-sky-100 bg-white p-3">

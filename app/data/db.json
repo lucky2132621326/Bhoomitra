@@ -298,7 +298,7 @@
       "organicAlternative": "Remove infected leaves and avoid overhead irrigation.",
       "dosage": "Use only at the dose on the locally registered product label",
       "timestamp": "2026-08-22T06:01:23.583Z",
-      "status": "active",
+      "status": "resolved",
       "treatedAt": null,
       "postSeverityScore": null,
       "linkedSprayId": null,
@@ -320,7 +320,7 @@
       "organicAlternative": "Remove infected foliage and avoid overhead irrigation.",
       "dosage": "Do not prepare a spray until the scan crop is confirmed",
       "timestamp": "2026-08-29T15:02:25.187Z",
-      "status": "active",
+      "status": "resolved",
       "treatedAt": null,
       "postSeverityScore": null,
       "linkedSprayId": null,
@@ -342,13 +342,57 @@
       "organicAlternative": "Wash leaf undersides with water, remove heavily infested leaves and conserve natural predators.",
       "dosage": "Do not prepare a spray until the scan crop is confirmed",
       "timestamp": "2026-09-04T04:58:09.526Z",
-      "status": "active",
+      "status": "resolved",
       "treatedAt": null,
       "postSeverityScore": null,
       "linkedSprayId": null,
       "scanCrop": "Grape",
       "modelCrop": "Tomato",
       "cropMatch": "review",
+      "modelId": "plant_disease_mobilenet_v2",
+      "modelVersion": "1.0.0"
+    },
+    {
+      "id": "45be0bfe-30d4-464c-8270-48b7895546eb",
+      "zoneId": "A1",
+      "disease": "Leaf_scorch",
+      "canonicalDisease": "Leaf_scorch",
+      "confidence": 0.5367615818977356,
+      "severityLevel": "moderate",
+      "severityScore": 2,
+      "recommendedChemical": "Crop confirmation required",
+      "organicAlternative": "Remove affected leaves, mulch soil and avoid splash irrigation.",
+      "dosage": "Do not prepare a spray until the scan crop is confirmed",
+      "timestamp": "2026-09-04T09:16:17.565Z",
+      "status": "resolved",
+      "treatedAt": null,
+      "postSeverityScore": null,
+      "linkedSprayId": null,
+      "scanCrop": "Grape",
+      "modelCrop": "Strawberry",
+      "cropMatch": "review",
+      "modelId": "plant_disease_mobilenet_v2",
+      "modelVersion": "1.0.0"
+    },
+    {
+      "id": "9e598faf-309f-4194-9281-13d27abf9713",
+      "zoneId": "A1",
+      "disease": "Esca_(Black_Measles)",
+      "canonicalDisease": "Esca_(Black_Measles)",
+      "confidence": 0.9284488558769226,
+      "severityLevel": "high",
+      "severityScore": 3,
+      "recommendedChemical": "No curative spray—extension-led vine management Not applicable",
+      "organicAlternative": "Improve vine vigour, remove infected wood and disinfect pruning tools.",
+      "dosage": "Use only at the dose on the locally registered product label",
+      "timestamp": "2026-09-04T09:17:14.194Z",
+      "status": "active",
+      "treatedAt": null,
+      "postSeverityScore": null,
+      "linkedSprayId": null,
+      "scanCrop": "Grape",
+      "modelCrop": "Grape",
+      "cropMatch": "matched",
       "modelId": "plant_disease_mobilenet_v2",
       "modelVersion": "1.0.0"
     }
@@ -380,6 +424,42 @@
   ],
   "zoneHistory": [],
   "activityLog": [
+    {
+      "type": "alert",
+      "recordId": "5d74475f-bd0e-4a9e-b7f9-ebd6b068dfd4",
+      "zoneId": "A1",
+      "timestamp": "2026-09-04T09:30:22.392Z",
+      "source": "pest-detection",
+      "pestId": "aphids",
+      "visibleCount": 3
+    },
+    {
+      "type": "alert",
+      "recordId": "4a52ba58-5ab4-4456-b134-bd932a3b6245",
+      "zoneId": "A1",
+      "timestamp": "2026-09-04T09:29:14.858Z",
+      "source": "pest-detection",
+      "pestId": "rice_leafhopper",
+      "visibleCount": 1
+    },
+    {
+      "type": "alert",
+      "recordId": "9b414655-135d-4018-a4b2-d8ebd05802a8",
+      "zoneId": "A1",
+      "timestamp": "2026-09-04T09:27:11.314Z",
+      "source": "pest-detection",
+      "pestId": "corn_borer",
+      "visibleCount": 1
+    },
+    {
+      "type": "alert",
+      "recordId": "a41096c5-182f-42df-af0e-e910b4e12d30",
+      "zoneId": "A1",
+      "timestamp": "2026-09-04T09:25:49.895Z",
+      "source": "pest-detection",
+      "pestId": "corn_borer",
+      "visibleCount": 1
+    },
     {
       "type": "water",
       "zoneId": "A4",
@@ -1525,6 +1605,710 @@
       "followUpDue": "2026-09-03T06:59:45.650Z",
       "outcomeNote": null,
       "updatedAt": "2026-09-02T06:59:45.650Z"
+    },
+    {
+      "zoneId": "A1",
+      "crop": "Grape",
+      "pestId": "corn_borer",
+      "pestName": "Corn borer",
+      "scientificName": "Maize stem-borer complex",
+      "confidence": 0.8224246501922607,
+      "confidenceBand": "high",
+      "cropMatch": "review",
+      "predictions": [
+        {
+          "label": "corn_borer",
+          "pestId": "corn_borer",
+          "pestName": "Corn borer",
+          "confidence": 0.8224246501922607,
+          "count": 1,
+          "boxCoverageRatio": 0.11112841994508263
+        }
+      ],
+      "detections": [
+        {
+          "classId": 5,
+          "label": "corn_borer",
+          "pestId": "corn_borer",
+          "confidence": 0.8224246501922607,
+          "areaRatio": 0.11112841994508263,
+          "box": {
+            "x1": 227.53883361816406,
+            "y1": 194.5165252685547,
+            "x2": 338.44873046875,
+            "y2": 445.00909423828125,
+            "width": 110.90989685058594,
+            "height": 250.49256896972656
+          }
+        }
+      ],
+      "imageWidth": 500,
+      "imageHeight": 500,
+      "visibleCount": 1,
+      "boxCoverageRatio": 0.11112841994508263,
+      "pressureLevel": "low",
+      "imageName": "ca2020_redbacked_cutworm_1.png",
+      "modelId": "bhoomitra_pest_detector_yolo26_v1",
+      "modelVersion": "1.0.0",
+      "farmerConfirmed": false,
+      "inference": {
+        "inputSize": 640,
+        "retryUsed": false,
+        "attemptedSizes": [
+          640
+        ]
+      },
+      "id": "a41096c5-182f-42df-af0e-e910b4e12d30",
+      "timestamp": "2026-09-04T09:25:49.895Z",
+      "status": "monitoring",
+      "followUpDue": "2026-09-05T09:25:49.895Z",
+      "followUps": [],
+      "outcomeNote": null,
+      "updatedAt": "2026-09-04T09:25:49.895Z",
+      "snapshot": {
+        "result": {
+          "success": true,
+          "detected": true,
+          "persisted": true,
+          "recordId": "a41096c5-182f-42df-af0e-e910b4e12d30",
+          "scan": {
+            "zoneId": "A1",
+            "crop": "Grape",
+            "language": "en",
+            "timestamp": "2026-09-04T09:25:49.895Z",
+            "imageName": "ca2020_redbacked_cutworm_1.png",
+            "comparablePhoto": false
+          },
+          "image": {
+            "width": 500,
+            "height": 500
+          },
+          "summary": {
+            "primaryPestId": "corn_borer",
+            "primaryPestName": "Corn borer",
+            "scientificName": "Maize stem-borer complex",
+            "cropMatch": "review",
+            "visibleCount": 1,
+            "boxCoverageRatio": 0.11112841994508263,
+            "pressureLevel": "low"
+          },
+          "predictions": [
+            {
+              "label": "corn_borer",
+              "pestId": "corn_borer",
+              "pestName": "Corn borer",
+              "count": 1,
+              "boxCoverageRatio": 0.11112841994508263
+            }
+          ],
+          "detections": [
+            {
+              "classId": 5,
+              "label": "corn_borer",
+              "pestId": "corn_borer",
+              "areaRatio": 0.11112841994508263,
+              "box": {
+                "x1": 227.53883361816406,
+                "y1": 194.5165252685547,
+                "x2": 338.44873046875,
+                "y2": 445.00909423828125,
+                "width": 110.90989685058594,
+                "height": 250.49256896972656
+              }
+            }
+          ],
+          "pressure": {
+            "level": "low",
+            "visibleCount": 1,
+            "boxCoverageRatio": 0.11112841994508263
+          },
+          "classificationLimit": "Counts and bounding boxes apply only to visible pests in this photo; they do not estimate whole-field severity.",
+          "pest": {
+            "damageSigns": [
+              "Rows of pinholes or shot holes on unfolding leaves",
+              "Frass in the whorl",
+              "Bored stems, deadheart or broken stalks"
+            ],
+            "whyItMatters": "Young larvae are most controllable before they tunnel into the maize stem, where surface treatment becomes ineffective."
+          },
+          "advice": {
+            "inspectToday": [
+              "Open the whorl on ten maize plants and check for fresh frass and young larvae.",
+              "Record how many plants show new shot holes or deadheart."
+            ],
+            "next48Hours": [
+              "Destroy badly infested whorls or stems in a small local patch where practical.",
+              "Recheck newly damaged plants before larvae enter stems."
+            ],
+            "prevention": [
+              "Remove infested stalk residues after harvest.",
+              "Use timely planting and locally recommended tolerant hybrids."
+            ],
+            "biologicalControl": [
+              "Use a maize-labelled Bacillus thuringiensis product only while young larvae remain exposed in whorls.",
+              "Conserve parasitoids and predators by avoiding unnecessary broad-spectrum sprays."
+            ],
+            "pesticide": {
+              "product": "Maize-registered selective stem-borer larvicide",
+              "type": "Selective caterpillar control",
+              "modeOfAction": "Choose a maize-labelled product effective against exposed young borer larvae.",
+              "resistanceNote": "Rotate IRAC groups and do not treat old bored stems without fresh activity.",
+              "labelRate": "Use only the rate printed on a product registered for this crop and pest.",
+              "application": "Target active whorls at the label-approved stage before larvae enter the stem.",
+              "interval": "Reinspect for fresh frass and new shot holes before repeating.",
+              "preHarvestInterval": "Follow the product label and local agricultural-extension guidance.",
+              "trigger": "Use only when fresh whorl damage and live-larva counts cross local guidance.",
+              "safety": "Wear label-required PPE, avoid drift and water contamination, and never spray while pollinators are active.",
+              "eligible": false,
+              "blockedReason": "The Corn borer guide is not verified for Grape. Confirm with local extension."
+            }
+          }
+        },
+        "photoName": "d3c5cc89-b759-4b81-aac0-6bdacc01fcfb.png"
+      }
+    },
+    {
+      "zoneId": "A1",
+      "crop": "Grape",
+      "pestId": "corn_borer",
+      "pestName": "Corn borer",
+      "scientificName": "Maize stem-borer complex",
+      "confidence": 0.7058038711547852,
+      "confidenceBand": "medium",
+      "cropMatch": "review",
+      "predictions": [
+        {
+          "label": "corn_borer",
+          "pestId": "corn_borer",
+          "pestName": "Corn borer",
+          "confidence": 0.7058038711547852,
+          "count": 1,
+          "boxCoverageRatio": 0.4835030010011355
+        }
+      ],
+      "detections": [
+        {
+          "classId": 5,
+          "label": "corn_borer",
+          "pestId": "corn_borer",
+          "confidence": 0.7058038711547852,
+          "areaRatio": 0.4835030010011355,
+          "box": {
+            "x1": 215.38682556152344,
+            "y1": 173.0026092529297,
+            "x2": 1217.1207275390625,
+            "y2": 715.1331787109375,
+            "width": 1001.7339019775391,
+            "height": 542.1305694580078
+          }
+        }
+      ],
+      "imageWidth": 1300,
+      "imageHeight": 864,
+      "visibleCount": 1,
+      "boxCoverageRatio": 0.4835030010011355,
+      "pressureLevel": "low",
+      "imageName": "srin-Cutworms-5-1300x864.jpeg",
+      "modelId": "bhoomitra_pest_detector_yolo26_v1",
+      "modelVersion": "1.0.0",
+      "farmerConfirmed": false,
+      "inference": {
+        "inputSize": 640,
+        "retryUsed": false,
+        "attemptedSizes": [
+          640
+        ]
+      },
+      "id": "9b414655-135d-4018-a4b2-d8ebd05802a8",
+      "timestamp": "2026-09-04T09:27:11.314Z",
+      "status": "monitoring",
+      "followUpDue": "2026-09-05T09:27:11.314Z",
+      "followUps": [],
+      "outcomeNote": null,
+      "updatedAt": "2026-09-04T09:27:11.314Z",
+      "snapshot": {
+        "result": {
+          "success": true,
+          "detected": true,
+          "persisted": true,
+          "recordId": "9b414655-135d-4018-a4b2-d8ebd05802a8",
+          "scan": {
+            "zoneId": "A1",
+            "crop": "Grape",
+            "language": "en",
+            "timestamp": "2026-09-04T09:27:11.314Z",
+            "imageName": "srin-Cutworms-5-1300x864.jpeg",
+            "comparablePhoto": false
+          },
+          "image": {
+            "width": 1300,
+            "height": 864
+          },
+          "summary": {
+            "primaryPestId": "corn_borer",
+            "primaryPestName": "Corn borer",
+            "scientificName": "Maize stem-borer complex",
+            "cropMatch": "review",
+            "visibleCount": 1,
+            "boxCoverageRatio": 0.4835030010011355,
+            "pressureLevel": "low"
+          },
+          "predictions": [
+            {
+              "label": "corn_borer",
+              "pestId": "corn_borer",
+              "pestName": "Corn borer",
+              "count": 1,
+              "boxCoverageRatio": 0.4835030010011355
+            }
+          ],
+          "detections": [
+            {
+              "classId": 5,
+              "label": "corn_borer",
+              "pestId": "corn_borer",
+              "areaRatio": 0.4835030010011355,
+              "box": {
+                "x1": 215.38682556152344,
+                "y1": 173.0026092529297,
+                "x2": 1217.1207275390625,
+                "y2": 715.1331787109375,
+                "width": 1001.7339019775391,
+                "height": 542.1305694580078
+              }
+            }
+          ],
+          "pressure": {
+            "level": "low",
+            "visibleCount": 1,
+            "boxCoverageRatio": 0.4835030010011355
+          },
+          "classificationLimit": "Counts and bounding boxes apply only to visible pests in this photo; they do not estimate whole-field severity.",
+          "pest": {
+            "damageSigns": [
+              "Rows of pinholes or shot holes on unfolding leaves",
+              "Frass in the whorl",
+              "Bored stems, deadheart or broken stalks"
+            ],
+            "whyItMatters": "Young larvae are most controllable before they tunnel into the maize stem, where surface treatment becomes ineffective."
+          },
+          "advice": {
+            "inspectToday": [
+              "Open the whorl on ten maize plants and check for fresh frass and young larvae.",
+              "Record how many plants show new shot holes or deadheart."
+            ],
+            "next48Hours": [
+              "Destroy badly infested whorls or stems in a small local patch where practical.",
+              "Recheck newly damaged plants before larvae enter stems."
+            ],
+            "prevention": [
+              "Remove infested stalk residues after harvest.",
+              "Use timely planting and locally recommended tolerant hybrids."
+            ],
+            "biologicalControl": [
+              "Use a maize-labelled Bacillus thuringiensis product only while young larvae remain exposed in whorls.",
+              "Conserve parasitoids and predators by avoiding unnecessary broad-spectrum sprays."
+            ],
+            "pesticide": {
+              "product": "Maize-registered selective stem-borer larvicide",
+              "type": "Selective caterpillar control",
+              "modeOfAction": "Choose a maize-labelled product effective against exposed young borer larvae.",
+              "resistanceNote": "Rotate IRAC groups and do not treat old bored stems without fresh activity.",
+              "labelRate": "Use only the rate printed on a product registered for this crop and pest.",
+              "application": "Target active whorls at the label-approved stage before larvae enter the stem.",
+              "interval": "Reinspect for fresh frass and new shot holes before repeating.",
+              "preHarvestInterval": "Follow the product label and local agricultural-extension guidance.",
+              "trigger": "Use only when fresh whorl damage and live-larva counts cross local guidance.",
+              "safety": "Wear label-required PPE, avoid drift and water contamination, and never spray while pollinators are active.",
+              "eligible": false,
+              "blockedReason": "The Corn borer guide is not verified for Grape. Confirm with local extension."
+            }
+          }
+        },
+        "photoName": "3597008e-277c-4c59-9969-71a24ace8d6d.jpg"
+      }
+    },
+    {
+      "zoneId": "A1",
+      "crop": "Grape",
+      "pestId": "rice_leafhopper",
+      "pestName": "Rice leafhopper",
+      "scientificName": "Cicadellidae rice leafhoppers",
+      "confidence": 0.46230462193489075,
+      "confidenceBand": "low",
+      "cropMatch": "review",
+      "predictions": [
+        {
+          "label": "rice_leafhopper",
+          "pestId": "rice_leafhopper",
+          "pestName": "Rice leafhopper",
+          "confidence": 0.46230462193489075,
+          "count": 1,
+          "boxCoverageRatio": 0.17796421072650365
+        }
+      ],
+      "detections": [
+        {
+          "classId": 4,
+          "label": "rice_leafhopper",
+          "pestId": "rice_leafhopper",
+          "confidence": 0.46230462193489075,
+          "areaRatio": 0.17796421072650365,
+          "box": {
+            "x1": 261.0692443847656,
+            "y1": 180.85162353515625,
+            "x2": 737.6477661132812,
+            "y2": 429.9231262207031,
+            "width": 476.5785217285156,
+            "height": 249.07150268554688
+          }
+        }
+      ],
+      "imageWidth": 1000,
+      "imageHeight": 667,
+      "visibleCount": 1,
+      "boxCoverageRatio": 0.17796421072650365,
+      "pressureLevel": "low",
+      "imageName": "Whitefly-2.webp",
+      "modelId": "bhoomitra_pest_detector_yolo26_v1",
+      "modelVersion": "1.0.0",
+      "farmerConfirmed": false,
+      "inference": {
+        "inputSize": 1280,
+        "retryUsed": true,
+        "attemptedSizes": [
+          640,
+          1280
+        ]
+      },
+      "id": "4a52ba58-5ab4-4456-b134-bd932a3b6245",
+      "timestamp": "2026-09-04T09:29:14.858Z",
+      "status": "monitoring",
+      "followUpDue": "2026-09-05T09:29:14.858Z",
+      "followUps": [],
+      "outcomeNote": null,
+      "updatedAt": "2026-09-04T09:29:14.858Z",
+      "snapshot": {
+        "result": {
+          "success": true,
+          "detected": true,
+          "persisted": true,
+          "recordId": "4a52ba58-5ab4-4456-b134-bd932a3b6245",
+          "scan": {
+            "zoneId": "A1",
+            "crop": "Grape",
+            "language": "en",
+            "timestamp": "2026-09-04T09:29:14.858Z",
+            "imageName": "Whitefly-2.webp",
+            "comparablePhoto": false
+          },
+          "image": {
+            "width": 1000,
+            "height": 667
+          },
+          "summary": {
+            "primaryPestId": "rice_leafhopper",
+            "primaryPestName": "Rice leafhopper",
+            "scientificName": "Cicadellidae rice leafhoppers",
+            "cropMatch": "review",
+            "visibleCount": 1,
+            "boxCoverageRatio": 0.17796421072650365,
+            "pressureLevel": "low"
+          },
+          "predictions": [
+            {
+              "label": "rice_leafhopper",
+              "pestId": "rice_leafhopper",
+              "pestName": "Rice leafhopper",
+              "count": 1,
+              "boxCoverageRatio": 0.17796421072650365
+            }
+          ],
+          "detections": [
+            {
+              "classId": 4,
+              "label": "rice_leafhopper",
+              "pestId": "rice_leafhopper",
+              "areaRatio": 0.17796421072650365,
+              "box": {
+                "x1": 261.0692443847656,
+                "y1": 180.85162353515625,
+                "x2": 737.6477661132812,
+                "y2": 429.9231262207031,
+                "width": 476.5785217285156,
+                "height": 249.07150268554688
+              }
+            }
+          ],
+          "pressure": {
+            "level": "low",
+            "visibleCount": 1,
+            "boxCoverageRatio": 0.17796421072650365
+          },
+          "classificationLimit": "Counts and bounding boxes apply only to visible pests in this photo; they do not estimate whole-field severity.",
+          "pest": {
+            "damageSigns": [
+              "Small wedge-shaped insects jumping from rice leaves",
+              "Yellowing or reduced plant vigour",
+              "Virus-like stunting or discoloration in patches"
+            ],
+            "whyItMatters": "Rice leafhoppers remove plant sap and some species can transmit rice diseases, so field distribution matters more than one photograph."
+          },
+          "advice": {
+            "inspectToday": [
+              "Sweep or tap ten rice hills and count leafhoppers at several points in the zone.",
+              "Check for spreading yellowing or virus-like symptoms."
+            ],
+            "next48Hours": [
+              "Remove grassy volunteer hosts near nursery beds where practical.",
+              "Repeat sweep counts at the same time of day and compare the marked locations."
+            ],
+            "prevention": [
+              "Use healthy seedlings and locally recommended resistant varieties.",
+              "Keep bund weeds managed while preserving beneficial insects."
+            ],
+            "biologicalControl": [
+              "Conserve spiders, egg parasitoids and predatory bugs.",
+              "Avoid broad-spectrum spraying when counts are low and natural enemies are active."
+            ],
+            "pesticide": {
+              "product": "Rice-registered selective leafhopper product",
+              "type": "Selective sucking-pest control",
+              "modeOfAction": "Select a registered product only after the leafhopper species and crop stage are confirmed.",
+              "resistanceNote": "Rotate IRAC groups and avoid calendar treatment.",
+              "labelRate": "Use only the rate printed on a product registered for this crop and pest.",
+              "application": "Treat only confirmed hotspots at the label-approved rice stage.",
+              "interval": "Repeat standardized sweep or hill counts before another treatment.",
+              "preHarvestInterval": "Follow the product label and local agricultural-extension guidance.",
+              "trigger": "Use when local counts or confirmed disease-vector risk reach extension guidance.",
+              "safety": "Wear label-required PPE, avoid drift and water contamination, and never spray while pollinators are active.",
+              "eligible": false,
+              "blockedReason": "Retake the photo or obtain expert confirmation before selecting a pesticide."
+            }
+          }
+        },
+        "photoName": "bf761b75-86f4-45ce-b4d9-a672c1bb3736.webp"
+      }
+    },
+    {
+      "zoneId": "A1",
+      "crop": "Grape",
+      "pestId": "aphids",
+      "pestName": "Aphids",
+      "scientificName": "Aphididae",
+      "confidence": 0.6986961960792542,
+      "confidenceBand": "medium",
+      "cropMatch": "review",
+      "predictions": [
+        {
+          "label": "aphids",
+          "pestId": "aphids",
+          "pestName": "Aphids",
+          "confidence": 0.6986961960792542,
+          "count": 3,
+          "boxCoverageRatio": 0.12082970561288672
+        }
+      ],
+      "detections": [
+        {
+          "classId": 7,
+          "label": "aphids",
+          "pestId": "aphids",
+          "confidence": 0.6986961960792542,
+          "areaRatio": 0.04096878784212517,
+          "box": {
+            "x1": 168.11463928222656,
+            "y1": 456.744873046875,
+            "x2": 375.34033203125,
+            "y2": 613.1388549804688,
+            "width": 207.22569274902344,
+            "height": 156.39398193359375
+          }
+        },
+        {
+          "classId": 7,
+          "label": "aphids",
+          "pestId": "aphids",
+          "confidence": 0.592858612537384,
+          "areaRatio": 0.02681007050455604,
+          "box": {
+            "x1": 137.47508239746094,
+            "y1": 93.35994720458984,
+            "x2": 316.6416015625,
+            "y2": 211.732666015625,
+            "width": 179.16651916503906,
+            "height": 118.37271881103516
+          }
+        },
+        {
+          "classId": 7,
+          "label": "aphids",
+          "pestId": "aphids",
+          "confidence": 0.5620085597038269,
+          "areaRatio": 0.05305084726620551,
+          "box": {
+            "x1": 736.1494750976562,
+            "y1": 121.5599136352539,
+            "x2": 951.4791870117188,
+            "y2": 316.4541015625,
+            "width": 215.3297119140625,
+            "height": 194.8941879272461
+          }
+        }
+      ],
+      "imageWidth": 1186,
+      "imageHeight": 667,
+      "visibleCount": 3,
+      "boxCoverageRatio": 0.12082970561288672,
+      "pressureLevel": "moderate",
+      "imageName": "whiteflies_d-kucharski-k-kucharska_ss_0.jpg",
+      "modelId": "bhoomitra_pest_detector_yolo26_v1",
+      "modelVersion": "1.0.0",
+      "farmerConfirmed": false,
+      "inference": {
+        "inputSize": 640,
+        "retryUsed": false,
+        "attemptedSizes": [
+          640
+        ]
+      },
+      "id": "5d74475f-bd0e-4a9e-b7f9-ebd6b068dfd4",
+      "timestamp": "2026-09-04T09:30:22.392Z",
+      "status": "monitoring",
+      "followUpDue": "2026-09-05T09:30:22.392Z",
+      "followUps": [],
+      "outcomeNote": null,
+      "updatedAt": "2026-09-04T09:30:22.392Z",
+      "snapshot": {
+        "result": {
+          "success": true,
+          "detected": true,
+          "persisted": true,
+          "recordId": "5d74475f-bd0e-4a9e-b7f9-ebd6b068dfd4",
+          "scan": {
+            "zoneId": "A1",
+            "crop": "Grape",
+            "language": "en",
+            "timestamp": "2026-09-04T09:30:22.392Z",
+            "imageName": "whiteflies_d-kucharski-k-kucharska_ss_0.jpg",
+            "comparablePhoto": false
+          },
+          "image": {
+            "width": 1186,
+            "height": 667
+          },
+          "summary": {
+            "primaryPestId": "aphids",
+            "primaryPestName": "Aphids",
+            "scientificName": "Aphididae",
+            "cropMatch": "review",
+            "visibleCount": 3,
+            "boxCoverageRatio": 0.12082970561288672,
+            "pressureLevel": "moderate"
+          },
+          "predictions": [
+            {
+              "label": "aphids",
+              "pestId": "aphids",
+              "pestName": "Aphids",
+              "count": 3,
+              "boxCoverageRatio": 0.12082970561288672
+            }
+          ],
+          "detections": [
+            {
+              "classId": 7,
+              "label": "aphids",
+              "pestId": "aphids",
+              "areaRatio": 0.04096878784212517,
+              "box": {
+                "x1": 168.11463928222656,
+                "y1": 456.744873046875,
+                "x2": 375.34033203125,
+                "y2": 613.1388549804688,
+                "width": 207.22569274902344,
+                "height": 156.39398193359375
+              }
+            },
+            {
+              "classId": 7,
+              "label": "aphids",
+              "pestId": "aphids",
+              "areaRatio": 0.02681007050455604,
+              "box": {
+                "x1": 137.47508239746094,
+                "y1": 93.35994720458984,
+                "x2": 316.6416015625,
+                "y2": 211.732666015625,
+                "width": 179.16651916503906,
+                "height": 118.37271881103516
+              }
+            },
+            {
+              "classId": 7,
+              "label": "aphids",
+              "pestId": "aphids",
+              "areaRatio": 0.05305084726620551,
+              "box": {
+                "x1": 736.1494750976562,
+                "y1": 121.5599136352539,
+                "x2": 951.4791870117188,
+                "y2": 316.4541015625,
+                "width": 215.3297119140625,
+                "height": 194.8941879272461
+              }
+            }
+          ],
+          "pressure": {
+            "level": "moderate",
+            "visibleCount": 3,
+            "boxCoverageRatio": 0.12082970561288672
+          },
+          "classificationLimit": "Counts and bounding boxes apply only to visible pests in this photo; they do not estimate whole-field severity.",
+          "pest": {
+            "damageSigns": [
+              "Colonies on tender shoots or leaf undersides",
+              "Curled young leaves",
+              "Sticky honeydew",
+              "Ant activity"
+            ],
+            "whyItMatters": "Aphids multiply rapidly, weaken new growth and can transmit plant viruses."
+          },
+          "advice": {
+            "inspectToday": [
+              "Count colonies on five tender shoots in the selected zone.",
+              "Check for ladybirds, lacewings and parasitised aphid mummies before spraying."
+            ],
+            "next48Hours": [
+              "Wash small colonies from sturdy plants with water.",
+              "Remove only badly curled, localised shoots and recount tomorrow."
+            ],
+            "prevention": [
+              "Avoid excessive nitrogen fertiliser.",
+              "Control weed hosts and inspect new seedlings before transplanting."
+            ],
+            "biologicalControl": [
+              "Conserve ladybirds, hoverflies and lacewings.",
+              "Use crop-labelled insecticidal soap or neem on small colonies."
+            ],
+            "pesticide": {
+              "product": "Crop-registered selective aphid product",
+              "type": "Selective sucking-pest insecticide",
+              "modeOfAction": "Select an active ingredient registered for the crop and aphid species.",
+              "resistanceNote": "Rotate IRAC groups and preserve natural enemies.",
+              "labelRate": "Use only the rate printed on a product registered for this crop and pest.",
+              "application": "Target confirmed colonies, especially leaf undersides; avoid whole-field treatment when infestation is local.",
+              "interval": "Recount colonies before any repeat treatment.",
+              "preHarvestInterval": "Follow the product label and local agricultural-extension guidance.",
+              "trigger": "Spray only when repeat counts rise above the crop-specific threshold and natural enemies are insufficient.",
+              "safety": "Wear label-required PPE, avoid drift and water contamination, and never spray while pollinators are active.",
+              "eligible": false,
+              "blockedReason": "The Aphids guide is not verified for Grape. Confirm with local extension."
+            }
+          }
+        },
+        "photoName": "e5f83a5a-519d-4ce1-9b7f-096f3aa55649.jpg"
+      }
     }
   ]
 }

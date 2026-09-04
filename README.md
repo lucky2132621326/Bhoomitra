@@ -45,16 +45,16 @@ python -m venv ml_service/venv
 ml_service/venv/Scripts/pip install -r ml_service/requirements.txt
 ml_service/venv/Scripts/python ml_service/main.py    # port 5000
 
-# 3. Pest detector service (separate terminal)
-python3 -m venv pest_ml_service/.venv
-pest_ml_service/.venv/bin/pip install -r pest_ml_service/requirements.txt
-pest_ml_service/.venv/bin/python pest_ml_service/main.py    # port 5001
+# 3. Pest detector service (separate terminal, Windows PowerShell)
+py -3.11 -m venv pest_ml_service/.venv
+& .\pest_ml_service\.venv\Scripts\python.exe -m pip install -r pest_ml_service\requirements.txt
+& .\pest_ml_service\.venv\Scripts\python.exe pest_ml_service\main.py    # port 5001
 
 # 4. (Optional) Hardware bridge — set your COM port in hardware_bridge.py
 python hardware_bridge.py
 ```
 
-The legacy launcher starts the leaf-disease service and frontend only; start the pest service separately, or use the complete commands in [the owner AI handoff](docs/OWNER_AI_HANDOFF.md):
+The Windows launcher starts the leaf-disease service, pest service, and frontend after both Python environments are installed:
 
 ```powershell
 scripts/start-demo.ps1

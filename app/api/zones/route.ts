@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import {
   zones,
+  zoneHistory,
   updateLiveZones,
   simulationEnabledRef,
   irrigationSettings,
@@ -15,6 +16,7 @@ import {
 import { getForecast } from "@/app/lib/weatherService"
 import { decideFarmActions } from "@/app/lib/farmDecisionService"
 import { readDB } from "@/app/lib/database"
+import { classifyStress } from "@/app/lib/stressClassifier"
 
 // This endpoint reflects live soil probes and the shared DHT11 station, so it
 // must never be prerendered or served as a build-time snapshot.
@@ -69,6 +71,25 @@ export async function GET() {
       }),
     ]),
   )
+  const stress = classifyStress({
+    weather: weatherForecast,
+    zones: zones.map((zone) => {
+      const history = zoneHistory.find((entry) => entry.zoneId === zone.id)
+      return {
+        soilMoisture: zone.soilMoisture,
+        dryThreshold: irrigationSettings.dryThreshold,
+        wetThreshold: irrigationSettings.wetThreshold,
+        temperature: farmClimate.temperature ?? zone.temperature,
+        humidity: farmClimate.humidity ?? zone.humidity,
+        vpd: zone.vpd,
+        soilHistory: history?.moistureHistory,
+        temperatureHistory: history?.temperatureHistory,
+        sensorFresh: Boolean(zone.sensor?.lastValidAt && Date.now() - zone.sensor.lastValidAt <= 15 * 60 * 1000),
+        sensorError: Boolean(zone.sensor?.hasError),
+        cycleActive: Boolean(zone.cycle?.active),
+      }
+    }),
+  })
   const actionableTargets = hydrateMeta.targeted.filter(zone => decisions.get(zone.id)?.irrigation.allowsStart)
   const deferredTargets = hydrateMeta.targeted.filter(zone => !decisions.get(zone.id)?.irrigation.allowsStart)
   const weatherContext = zones.length > 0 ? decisions.get(zones[0].id)?.weather : null
@@ -108,6 +129,7 @@ export async function GET() {
     farmClimate,
     climatePresentation,
     weather: weatherContext,
+    stress,
     controller: {
       ...hardwareState,
       queuedCommandCount: Object.values(pendingCommands).reduce((total, queue) => total + queue.length, 0),
