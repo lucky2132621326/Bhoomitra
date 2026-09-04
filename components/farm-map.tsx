@@ -307,6 +307,7 @@ export default function FarmMap() {
   const [farmWeather, setFarmWeather] = useState<FarmWeather | null>(null)
   const [stress, setStress] = useState<StressResult | null>(null)
   const [stressExpanded, setStressExpanded] = useState(false)
+  const [selectedStress, setSelectedStress] = useState<"overall" | "drought" | "flood" | "heat">("overall")
   const [isOnline, setIsOnline] = useState(true)
   const [waterSummary, setWaterSummary] = useState<{
     calibrated: boolean
@@ -473,8 +474,6 @@ export default function FarmMap() {
       clearInterval(leverageInterval)
     }
   }, [])
-
-  const stressStatus = !isOnline ? "Internet Unavailable" : stress?.status || "Checking local stress conditions"
 
   // The map is always rendered from the API's real zone graph. This prevents
   // profile defaults or stale configuration from silently hiding A6/B6.
@@ -1002,7 +1001,9 @@ export default function FarmMap() {
                         { label: "Flood Risk", value: stress?.scores.flood == null ? "Checking" : stress.scores.flood >= 75 ? "High" : stress.scores.flood >= 50 ? "Moderate" : stress.scores.flood >= 25 ? "Low" : "Normal", icon: <CloudRain className="h-3.5 w-3.5" />, tone: (stress?.scores.flood ?? 0) >= 50 ? "text-blue-700" : "text-slate-900" },
                         { label: "Heat Risk", value: stress?.scores.heat == null ? "Checking" : stress.scores.heat >= 75 ? "High" : stress.scores.heat >= 50 ? "Moderate" : stress.scores.heat >= 25 ? "Low" : "Normal", icon: <Thermometer className="h-3.5 w-3.5" />, tone: (stress?.scores.heat ?? 0) >= 50 ? "text-red-700" : "text-slate-900" },
                       ].map((tile) => (
-                        <WeatherStatTile key={tile.label} icon={tile.icon} label={tile.label} value={tile.value} tone={tile.tone} />
+                        <button key={tile.label} type="button" onClick={() => { setSelectedStress(tile.label === "Drought Risk" ? "drought" : tile.label === "Flood Risk" ? "flood" : tile.label === "Heat Risk" ? "heat" : "overall"); setStressExpanded(true) }} className="text-left transition hover:-translate-y-0.5">
+                          <WeatherStatTile icon={tile.icon} label={tile.label} value={tile.value} tone={tile.tone} />
+                        </button>
                       ))}
                     </div>
 
@@ -1012,32 +1013,31 @@ export default function FarmMap() {
                       className="mt-2 flex w-full items-center justify-between rounded-lg border border-sky-100 bg-white px-3 py-2 text-left text-xs font-semibold text-sky-800 hover:bg-sky-50"
                       aria-haspopup="dialog"
                     >
-                      <span>{stressStatus} · confidence {stress?.confidence ?? 0}%</span>
+                      <span>{isOnline ? (stress?.status === "Online Verified" ? "Online" : "Online · local estimate") : "Offline"} · view full stress details</span>
                       <ChevronDown className="h-4 w-4" />
                     </button>
 
                     <Dialog open={stressExpanded} onOpenChange={setStressExpanded}>
                       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
                         <DialogHeader>
-                          <DialogTitle className="flex items-center gap-2"><AlertTriangle className="h-5 w-5 text-amber-600" /> Field stress risk details</DialogTitle>
+                          <DialogTitle className="flex items-center gap-2"><AlertTriangle className="h-5 w-5 text-amber-600" /> {selectedStress === "overall" ? "Field stress risk details" : `${selectedStress[0].toUpperCase()}${selectedStress.slice(1)} stress details`}</DialogTitle>
                           <DialogDescription>Evidence-based local assessment using the connected farm sensors, zone history, irrigation activity, and Regional Weather API.</DialogDescription>
                         </DialogHeader>
                         {stress && (
                           <div className="space-y-4 text-sm text-slate-700">
-                            <div className="grid gap-2 sm:grid-cols-4">
+                          <div className="grid gap-2 sm:grid-cols-3">
                               <div className="rounded-lg border border-sky-100 bg-sky-50 p-3"><p className="text-[10px] font-bold uppercase text-sky-700">Condition</p><p className="mt-1 text-lg font-black">{stress.condition}</p></div>
                               <div className="rounded-lg border border-sky-100 bg-sky-50 p-3"><p className="text-[10px] font-bold uppercase text-sky-700">Severity</p><p className="mt-1 text-lg font-black">{stress.severity}</p></div>
-                              <div className="rounded-lg border border-sky-100 bg-sky-50 p-3"><p className="text-[10px] font-bold uppercase text-sky-700">Confidence</p><p className="mt-1 text-lg font-black">{stress.confidence}%</p></div>
-                              <div className="rounded-lg border border-sky-100 bg-sky-50 p-3"><p className="text-[10px] font-bold uppercase text-sky-700">Status</p><p className="mt-1 text-sm font-black">{isOnline ? stress.status : "Internet Unavailable"}</p></div>
+                              <div className="rounded-lg border border-sky-100 bg-sky-50 p-3"><p className="text-[10px] font-bold uppercase text-sky-700">Mode</p><p className="mt-1 text-sm font-black">{isOnline ? "Online" : "Offline"}</p></div>
                             </div>
                             <div className="rounded-xl border border-slate-200 p-4">
-                              <h3 className="font-black text-slate-900">Risk factors</h3>
+                              <h3 className="font-black text-slate-900">{selectedStress === "overall" ? "Risk factors" : `${selectedStress[0].toUpperCase()}${selectedStress.slice(1)} risk factors`}</h3>
                               <div className="mt-3 grid gap-3 sm:grid-cols-3">
                                 {[
                                   ["Drought", stress.scores.drought, "Low soil moisture, drying trend, high evaporative demand, and absent rainfall."],
                                   ["Flood / excess water", stress.scores.flood, "Wet soil, rainfall, persistent saturation, and recent irrigation activity."],
                                   ["Heat stress", stress.scores.heat, "High temperature, VPD, duration of heat, and dry-soil amplification."],
-                                ].map(([name, score, explanation]) => <div key={String(name)} className="rounded-lg bg-slate-50 p-3"><div className="flex items-center justify-between"><span className="font-bold">{name}</span><span className="font-black">{score}/100</span></div><p className="mt-1 text-xs leading-5 text-slate-600">{explanation}</p></div>)}
+                                ].map(([name, score, explanation]) => <div key={String(name)} className={`rounded-lg p-3 ${selectedStress === String(name).split(" ")[0].toLowerCase() ? "border-2 border-sky-500 bg-sky-50" : "bg-slate-50"}`}><div className="flex items-center justify-between"><span className="font-bold">{name}</span><span className="font-black">{score}/100</span></div><p className="mt-1 text-xs leading-5 text-slate-600">{explanation}</p></div>)}
                               </div>
                             </div>
                             <div className="grid gap-2 rounded-xl border border-slate-200 p-4 sm:grid-cols-2">
