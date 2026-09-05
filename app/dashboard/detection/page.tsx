@@ -496,7 +496,7 @@ export default function DetectionPage() {
                     </p>
                   </Card>
 
-                  <div className="grid gap-3 md:grid-cols-2">
+                  <div className="grid gap-3">
                     <Button
                       className="h-12 bg-[#3a7d44] text-white hover:bg-[#2e6336]"
                       onClick={() => {
@@ -507,13 +507,6 @@ export default function DetectionPage() {
                       }}
                     >
                       {canOpenSprayPlan ? t("detection.openSprayPlan") : t("detection.reviewFieldResponse")}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="h-12 border-[#3a7d44] text-[#2e6336] hover:bg-green-50"
-                      onClick={() => window.location.assign(`/dashboard/spread-control?zone=${encodeURIComponent(result.zoneId)}&detection=${encodeURIComponent(result.detectionId)}`)}
-                    >
-                      {t("detection.runSpreadControl")}
                     </Button>
                   </div>
 

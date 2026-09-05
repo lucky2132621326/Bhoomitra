@@ -20,7 +20,6 @@ import {
     History,
     LogOut,
     UserCircle,
-    Radar,
     PanelLeftClose,
     PanelLeftOpen,
     Bug,
@@ -100,7 +99,6 @@ export default function DashboardLayout({
                 { name: t("nav.autospray"), href: "/dashboard/autospray", icon: SprayCan },
                 { name: t("nav.map"), href: "/dashboard/map", icon: Map },
                 { name: t("nav.pests"), href: "/dashboard/pests", icon: Bug },
-                { name: t("nav.spreadControl"), href: "/dashboard/spread-control", icon: Radar },
             ],
         },
         {
