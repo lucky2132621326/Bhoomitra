@@ -1,4 +1,5 @@
 import type { PestChemicalGuidance } from "@/app/data/pestKnowledge"
+import type { GeminiAnalysisSource, GeminiDetectionAnalysis } from "@/app/lib/llmRecommendationEngine"
 
 export type PestPressure = "none" | "unknown" | "low" | "moderate" | "high"
 export type PestScanResult = {
@@ -24,6 +25,9 @@ export type PestScanResult = {
     inspectToday: string[]; next48Hours: string[]; prevention: string[]; biologicalControl: string[]
     pesticide: PestChemicalGuidance & { eligible: boolean; blockedReason: string | null }
   }
+  /** Online-enhancement result — same three-state contract as Disease Detection. Absent on legacy/older records. */
+  analysisSource?: GeminiAnalysisSource
+  geminiAnalysis?: GeminiDetectionAnalysis | null
 }
 
 // Scores remain on the private PestRecord, never in the browser snapshot.

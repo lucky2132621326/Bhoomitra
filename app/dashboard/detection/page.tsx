@@ -36,6 +36,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { AiSourceBadge } from "@/components/ai-source-badge"
+import { GeminiAnalysisPanel } from "@/components/gemini-analysis-panel"
+import type { GeminiAnalysisSource, GeminiDetectionAnalysis } from "@/app/lib/llmRecommendationEngine"
 
 const FALLBACK_ZONE_IDS = ["A1", "A2", "A3", "A4", "A5", "A6", "B1", "B2", "B3", "B4", "B5", "B6"]
 const SUPPORTED_SCAN_CROPS = ["Paddy", "Tomato", "Grape", "Apple", "Potato", "Maize", "Pepper", "Citrus"]
@@ -52,6 +55,8 @@ type ScanResult = {
   scanCrop?: string
   modelCrop?: string
   cropMatch?: "matched" | "review" | "not_applicable"
+  analysisSource?: GeminiAnalysisSource
+  geminiAnalysis?: GeminiDetectionAnalysis | null
 }
 
 export default function DetectionPage() {
@@ -136,6 +141,8 @@ export default function DetectionPage() {
           scanCrop: data.detection.scanCrop || scanCrop,
           modelCrop: data.detection.modelCrop,
           cropMatch: data.detection.cropMatch,
+          analysisSource: data.analysisSource,
+          geminiAnalysis: data.geminiAnalysis ?? null,
         })
 
         toast.success(t("detection.analysisComplete", { zone: scanZoneId }))
@@ -338,13 +345,16 @@ export default function DetectionPage() {
               <Card className="border-green-100 shadow-2xl rounded-[2.5rem] overflow-hidden">
                 <div className={`h-2 w-full ${severity === "High" ? "bg-red-500" : severity === "Moderate" ? "bg-orange-500" : "bg-green-500"}`}></div>
                 <CardHeader className="pb-4">
-                  <div className="flex items-center justify-between">
-                    <Badge 
-                      variant={severity === "High" ? "destructive" : severity === "Moderate" ? "warning" as any : "default"}
-                      className="px-4 py-1 rounded-full uppercase tracking-widest font-black text-[10px]"
-                    >
-                      {severity === "High" ? t("detection.alertActionRequired") : severity === "Moderate" ? t("detection.monitoringRequired") : t("detection.systemNormal")}
-                    </Badge>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge
+                        variant={severity === "High" ? "destructive" : severity === "Moderate" ? "warning" as any : "default"}
+                        className="px-4 py-1 rounded-full uppercase tracking-widest font-black text-[10px]"
+                      >
+                        {severity === "High" ? t("detection.alertActionRequired") : severity === "Moderate" ? t("detection.monitoringRequired") : t("detection.systemNormal")}
+                      </Badge>
+                      {!isHealthyResult && !requiresCropConfirmation && <AiSourceBadge source={result.analysisSource} />}
+                    </div>
                     <div
                       className="max-w-[17rem] break-all text-right text-xs font-bold text-slate-400"
                       title={result.detectionId || undefined}
@@ -489,6 +499,14 @@ export default function DetectionPage() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Gemini analysis is purely additive: shown only when the online
+                      call actually succeeded and validated. The ML diagnosis and
+                      recommended treatment above are complete and correct on their
+                      own — this section only adds context, it never replaces them. */}
+                  {result.analysisSource === "gemini" && result.geminiAnalysis && (
+                    <GeminiAnalysisPanel analysis={result.geminiAnalysis} />
+                  )}
 
                   <Card className="bg-amber-50 border-amber-200 rounded-2xl p-5">
                     <p className="text-xs font-bold text-amber-900 leading-relaxed">

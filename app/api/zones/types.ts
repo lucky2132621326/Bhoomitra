@@ -93,6 +93,8 @@ export type DetectionEvent = {
   cropMatch?: "matched" | "review" | "not_applicable"
   modelId?: string | null
   modelVersion?: string | null
+  /** Stored filename of the uploaded leaf photo, when one could be saved. */
+  photoName?: string | null
 }
 
 export interface ZoneHistoryEntry {

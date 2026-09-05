@@ -39,12 +39,16 @@ const photos = loadTS("app/lib/pestPhotos.ts", { fs: {
 let currentUser = { blocked: false }
 const mocks = {
   "next/server": { NextResponse: Response },
-  "@/app/api/zones/data": { zones: [{ id: "A1" }] },
+  "@/app/api/zones/data": { zones: [{ id: "A1" }], getFarmClimate: () => ({ fresh: false }) },
   "@/app/lib/pestRecords": records,
   "@/app/data/pestKnowledge": knowledge,
   "@/app/lib/pestZoneHistory": zoneHistory,
   "@/app/lib/pestPhotos": photos,
   "@/app/lib/session": { getCurrentUser: () => currentUser },
+  "@/app/lib/weatherService": { getForecast: async () => ({ current: {}, derived: {} }) },
+  // Gemini is never attempted in this offline regression harness — no server
+  // requests are sent, matching the file's own contract (see header comment).
+  "@/app/lib/llmRecommendationEngine": { isGeminiConfigured: () => false, isInternetAvailable: async () => false },
 }
 const route = loadTS("app/api/pest-detect/route.ts", mocks)
 const historyRoute = loadTS("app/api/pests/route.ts", mocks)

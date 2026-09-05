@@ -5,6 +5,13 @@ import { getForecast } from "@/app/lib/weatherService"
 import { decideFarmActions } from "@/app/lib/farmDecisionService"
 import { buildSpreadPlan } from "@/app/lib/spreadEngine"
 import { getTreatmentOptions } from "@/app/lib/mlProcessor"
+import { readLeafPhoto } from "@/app/lib/leafPhotos"
+import {
+  isGeminiConfigured,
+  isInternetAvailable,
+  requestGeminiRecommendation,
+  type LLMFarmContext,
+} from "@/app/lib/llmRecommendationEngine"
 
 /**
  * Recommendations engine.
@@ -20,9 +27,25 @@ import { getTreatmentOptions } from "@/app/lib/mlProcessor"
  * diagnosis confidence (not a random number); "insights" are operational
  * metrics tallied from the detection/spray history, not invented accuracy
  * percentages.
+ *
+ * Offline/online modes (see app/lib/llmRecommendationEngine.ts):
+ * every treatment recommendation is fully built from the ML model + decision
+ * engine first — that object is the complete offline recommendation and is
+ * always returned as-is. When the internet is reachable and GEMINI_API_KEY is
+ * configured, that same recommendation is optionally handed to Gemini (with
+ * the ML diagnosis, live sensors, weather, and the saved leaf photo(s)) to
+ * produce a more contextual explanation. If Gemini is unavailable, times out,
+ * or returns anything that fails validation, the ML-built recommendation is
+ * left untouched — the online path can only add, never replace the ML
+ * diagnosis or the chemical/dosage used to drive sprays.
  */
 
 type Severity = "low" | "moderate" | "high"
+// "ml-offline": Gemini was never attempted (no internet or no GEMINI_API_KEY).
+// "gemini": Gemini was attempted and returned a validated enhancement.
+// "ml-fallback": Gemini was attempted (internet + key available) but failed,
+// timed out, or returned invalid output — the ML recommendation was kept.
+type RecommendationSource = "ml-offline" | "gemini" | "ml-fallback"
 
 function normalizeSeverity(level?: string): Severity {
   if (level === "high") return "high"
@@ -45,6 +68,17 @@ export async function GET() {
   const weather = await getForecast()
   const climate = getFarmClimate()
   const now = Date.now()
+
+  // ── Offline vs. online recommendation mode ─────────────────────────────────
+  // Offline (no internet, or no GEMINI_API_KEY configured): recommendations
+  // come entirely from the ML model + decision engine, exactly as before this
+  // feature was added — Gemini is never called and never awaited. Online: the
+  // same ML-based recommendation is built first (so it always exists as the
+  // fallback), then optionally enhanced by a Gemini call that interprets the
+  // diagnosis together with live sensor, weather, and photo evidence. A
+  // failed/invalid/timed-out Gemini call never blocks or breaks the response —
+  // it just leaves the ML recommendation as-is.
+  const llmAvailable = isGeminiConfigured() && (await isInternetAvailable())
 
   const detections: any[] = db.detections || []
   const sprays: any[] = (db.sprays || []).filter(
@@ -87,6 +121,11 @@ export async function GET() {
 
   const recommendations: any[] = []
   let weatherAwareCount = 0
+  // Treatment recommendations queued for optional LLM enhancement. Each entry's
+  // `rec` is the already-complete ML-based recommendation (the guaranteed
+  // fallback); enhancement only overlays fields onto it if the LLM call
+  // succeeds and validates.
+  const enhancementTargets: { rec: any; context: LLMFarmContext }[] = []
 
   // ── Treatment recommendations from real active detections ─────────────────
   for (const det of actionableDetections) {
@@ -109,6 +148,25 @@ export async function GET() {
     const currentTreatment = getTreatmentOptions(canonicalDisease, det.scanCrop || cropLabel)
     const currentChemicalName = currentTreatment.chemicals?.[0]?.chemicalName
     const isCulturalOnly = Boolean(currentChemicalName && /no curative|not applicable|no chemical/i.test(currentChemicalName))
+
+    // Leaf photo(s) for this detection/zone: this scan's own photo plus up to
+    // two other recent scans of the SAME zone and disease (from treatment
+    // history), most recent first. Filenames are exposed to the UI for
+    // display regardless of connectivity; only when Gemini is actually
+    // called are the bytes read and base64-encoded (below).
+    const photoNames: string[] = []
+    {
+      const seen = new Set<string>()
+      const related = [det, ...detections.filter((other) =>
+        other.id !== det.id && other.zoneId === det.zoneId && (other.canonicalDisease || other.disease) === canonicalDisease,
+      ).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())]
+      for (const r of related) {
+        if (photoNames.length >= 3) break
+        if (!r.photoName || seen.has(r.photoName)) continue
+        seen.add(r.photoName)
+        photoNames.push(r.photoName)
+      }
+    }
 
     if (isCulturalOnly) {
       const guidance = currentTreatment.offlineRecommendation?.organicAlternative || det.organicAlternative || "Cultural and structural management — no curative spray exists for this condition."
@@ -135,6 +193,10 @@ export async function GET() {
         detectionId: det.id,
         disease: det.disease,
         scannedAt: det.timestamp,
+        // No curative spray exists for this condition — Gemini has nothing
+        // safe to add here, so this stays ML-only regardless of connectivity.
+        recommendationSource: "ml-offline" as RecommendationSource,
+        photoNames,
       })
       continue
     }
@@ -205,7 +267,7 @@ export async function GET() {
       reasoning.push(`Spread model: containing this active detection is associated with ~${spreadLeverage.toFixed(1)} projected secondary infections over the next 5 days.`)
     }
 
-    recommendations.push({
+    const treatmentRec = {
       id: `treat-${det.id}`,
       kind: "treatment",
       severity,
@@ -224,11 +286,92 @@ export async function GET() {
       decisionAction: spray?.action || "unknown",
       detectionId: det.id,
       // Fields the UI needs to trigger the real spray command (closes the loop).
+      // These always come from the ML model / offline catalog, never the LLM.
       chemical,
       dosage: det.dosage || "",
       disease: det.disease || diseaseLabel,
       spreadLeverage,
       scannedAt: det.timestamp,
+      // "ml-fallback" means Gemini was attempted this request but did not
+      // produce a usable result; it flips to "gemini" below on success. When
+      // llmAvailable is false, Gemini is never attempted, so this stays the
+      // plain offline label.
+      recommendationSource: (llmAvailable ? "ml-fallback" : "ml-offline") as RecommendationSource,
+      // Structured sensor/weather snapshot for this recommendation — the same
+      // values already computed above for the decision engine and (below) for
+      // the Gemini context, now also exposed to the UI so it can render them
+      // as evidence chips instead of parsing them back out of `reasoning`.
+      photoNames,
+      soilMoisturePct: zone?.soilMoisture ?? null,
+      temperatureC: climate.fresh ? climate.temperature : null,
+      humidityPct: climate.fresh ? climate.humidity : null,
+      vpdKpa: climate.fresh ? climate.vpd : null,
+      vpdBand: climate.fresh ? climate.vpdBand : null,
+      weatherDescription: weather.current?.description ?? null,
+      windSpeedKmh: weather.current?.windSpeed ?? null,
+      nextRainHours: weather.derived?.nextRainHours ?? null,
+    }
+    recommendations.push(treatmentRec)
+
+    if (llmAvailable) {
+      const photos: LLMFarmContext["photos"] = []
+      for (const name of photoNames) {
+        const stored = readLeafPhoto(name)
+        if (stored) photos.push({ base64: stored.bytes.toString("base64"), mimeType: stored.contentType })
+      }
+
+      enhancementTargets.push({
+        rec: treatmentRec,
+        context: {
+          zoneId: det.zoneId,
+          crop: cropLabel,
+          disease: diseaseLabel,
+          mlConfidencePct: confidencePct,
+          severity,
+          mlChemical: chemical,
+          mlDosage: det.dosage || undefined,
+          mlOrganicAlternative: currentTreatment.organic?.[0],
+          soilMoisturePct: zone?.soilMoisture ?? null,
+          temperatureC: climate.fresh ? climate.temperature : null,
+          humidityPct: climate.fresh ? climate.humidity : null,
+          vpdKpa: climate.fresh ? climate.vpd : null,
+          vpdBand: climate.fresh ? climate.vpdBand : null,
+          weatherDescription: weather.current?.description ?? null,
+          windSpeedKmh: weather.current?.windSpeed ?? null,
+          windDirectionDeg: weather.current?.windDirection ?? null,
+          nextRainHours: weather.derived?.nextRainHours ?? null,
+          totalRain24hMm: weather.derived?.totalRain24h ?? null,
+          fungalPressureBand: weather.derived?.fungalPressure?.band ?? null,
+          sprayWindowSafeNow: weather.derived?.sprayWindow?.safeNow ?? null,
+          photos,
+        },
+      })
+    }
+  }
+
+  // ── Optional online enhancement pass (Gemini) ───────────────────────────────
+  // Runs after the ML-based recommendations are fully built, so every one of
+  // them already has a complete, correct fallback. Calls run concurrently and
+  // each has its own timeout (see llmRecommendationEngine), so one slow/failed
+  // call cannot block the others or the response as a whole.
+  if (llmAvailable && enhancementTargets.length > 0) {
+    const results = await Promise.allSettled(
+      enhancementTargets.map((target) => requestGeminiRecommendation(target.context)),
+    )
+    results.forEach((result, index) => {
+      const target = enhancementTargets[index]
+      if (result.status !== "fulfilled" || !result.value.ok) return // stays "ml-fallback"
+      const llm = result.value.data
+      target.rec.recommendationSource = "gemini"
+      target.rec.llm = llm
+      target.rec.action = `${llm.recommended_action} ${llm.treatment}`.trim()
+      target.rec.timing = llm.timing
+      target.rec.reasoning = [
+        ...target.rec.reasoning,
+        `AI interpretation: ${llm.reasoning}`,
+        `Weather consideration: ${llm.weather_consideration}`,
+        `Safety notes: ${llm.safety_notes}`,
+      ]
     })
   }
 
@@ -367,6 +510,10 @@ export async function GET() {
       weatherFetchedAt: weather.fetchedAt,
       location: weather.location.name,
       locationConfigured: weather.location.isConfigured,
+      // "online" = Gemini-enhanced recommendations were attempted this request
+      // (internet reachable + GEMINI_API_KEY configured); "offline" = pure
+      // ML/rule based recommendations, identical to the pre-LLM behaviour.
+      recommendationMode: llmAvailable ? "online" : "offline",
     },
   })
 }

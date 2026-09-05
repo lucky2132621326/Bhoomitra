@@ -6,7 +6,7 @@ Bhoomitra helps smallholder farmers detect crop diseases from a leaf photo, get 
 
 1. **AI disease detection** — upload a leaf photo; a MobileNetV2 model (trained on the 38-class PlantVillage dataset) identifies the crop and disease with a confidence score.
 2. **Pest detection and prevention** — a trained YOLO26 detector locates and counts visible pests from 10 field-pest classes, draws bounding boxes, and produces a photo-level pressure cue. Each class has distinct scouting, prevention, lower-impact treatment, and crop-aware pesticide guidance. Model confidence is retained in the audit record but hidden from the farmer interface.
-3. **Severity scoring + IPM recommendation** — confidence is mapped to a severity level, and the system looks up a treatment: active ingredient, dosage, spray interval, pre-harvest interval, resistance group, and an organic alternative. Low-confidence predictions deliberately get *no* pesticide recommendation — the farmer is told to retake the photo and consult local extension.
+3. **Severity scoring + IPM recommendation** — confidence is mapped to a severity level, and the system looks up a treatment: active ingredient, dosage, spray interval, pre-harvest interval, resistance group, and an organic alternative. Low-confidence predictions deliberately get *no* pesticide recommendation — the farmer is told to retake the photo and consult local extension. The ML/offline catalog is always computed first and is the guaranteed fallback; when the internet is reachable and `GEMINI_API_KEY` is set, that same recommendation is optionally enhanced by a Google Gemini call that interprets the diagnosis together with live sensors, weather, and the leaf photo(s) — see `app/lib/llmRecommendationEngine.ts`. Any Gemini failure, timeout, or malformed response silently falls back to the ML recommendation.
 4. **Farm map & zone monitoring** — the farm is divided into grid zones with live soil moisture, temperature, and humidity. Zones are color-coded by moisture thresholds, and a VPD (vapor pressure deficit) calculation gates spraying to the optimal weather window.
 5. **Smart irrigation** — per-zone timed hydration cycles (10 min on / 50 min off), auto-stop on wet threshold, stuck-sensor detection, ripening-mode lockout, and a global "Hydrate" that targets only dry zones.
 6. **Spread Control AI** — simulates disease spread across plots (BFS over the farm grid) and computes the best treatment plan under a budget (greedy optimization). See `SPREAD_CONTROL_GUIDE.md`.
@@ -34,6 +34,15 @@ The dashboard is wired to a physical rig:
 Data flow: the ESP32 prints sensor JSON over serial → `hardware_bridge.py` forwards it to `POST /api/sensor` → the server updates the zone and replies with any queued command (`WATER:A1`, `SPRAY:A1`, `STOP:A1`) → the bridge writes it back to the ESP32, which drives the servo and relays. When real sensor data arrives, the server automatically switches off simulation mode.
 
 ## Running it
+
+Optional: create `.env.local` in the project root to enable Gemini-enhanced recommendations (the app works fully offline without it — recommendations then use the ML model only). The key is read server-side only; it is never sent to the browser and never logged:
+
+```
+GEMINI_API_KEY=your-key-here
+# Optional overrides (defaults shown):
+# GEMINI_RECOMMENDATION_MODEL=gemini-flash-lite-latest
+# GEMINI_RECOMMENDATION_TIMEOUT_MS=6000
+```
 
 ```bash
 # 1. Frontend

@@ -26,6 +26,7 @@ import {
   Clock,
   TrendingUp,
   Droplets,
+  Droplet,
   MapPin,
   CloudRain,
   Wind,
@@ -37,7 +38,27 @@ import {
   RefreshCw,
   Bug,
   Gauge,
+  Sparkles,
+  Cpu,
+  CloudOff,
+  Thermometer,
+  ShieldAlert,
+  ShieldCheck,
+  ImageIcon,
 } from "lucide-react"
+
+/** The fixed structured shape Gemini returns — see app/lib/llmRecommendationEngine.ts. */
+interface LLMRecommendation {
+  diagnosis: string
+  confidence: string
+  severity: string
+  recommended_action: string
+  treatment: string
+  timing: string
+  weather_consideration: string
+  reasoning: string
+  safety_notes: string
+}
 
 interface ApiRec {
   id: string
@@ -62,6 +83,24 @@ interface ApiRec {
   disease?: string
   spreadLeverage?: number
   scannedAt?: string
+  /**
+   * "gemini": an online Gemini call succeeded and validated (AI-enhanced).
+   * "ml-offline": Gemini was never attempted (no internet / not configured).
+   * "ml-fallback": Gemini was attempted but failed/timed out/returned invalid output.
+   */
+  recommendationSource?: "ml-offline" | "gemini" | "ml-fallback"
+  /** Present only when recommendationSource === "gemini". Advisory only — never drives the actual spray chemical/dosage. */
+  llm?: LLMRecommendation
+  /** Stored leaf-photo filenames (see /api/leaf-photos/[name]), most recent first. */
+  photoNames?: string[]
+  soilMoisturePct?: number | null
+  temperatureC?: number | null
+  humidityPct?: number | null
+  vpdKpa?: number | null
+  vpdBand?: string | null
+  weatherDescription?: string | null
+  windSpeedKmh?: number | null
+  nextRainHours?: number | null
 }
 
 interface Insights {
@@ -100,7 +139,10 @@ interface SavedRecommendationPayload {
 }
 
 const RECOMMENDATIONS_CACHE_KEY = "bhoomitra:last-recommendation-plan"
-const RECOMMENDATIONS_TIMEOUT_MS = 5_000
+// Wide enough to cover an optional server-side LLM-enhancement pass (connectivity
+// check + per-detection LLM call, run concurrently) on top of the base ML fetch,
+// while still falling back to the last saved plan if something is truly stuck.
+const RECOMMENDATIONS_TIMEOUT_MS = 10_000
 
 function readSavedPlan(): SavedRecommendationPayload | null {
   if (typeof window === "undefined") return null
@@ -142,6 +184,77 @@ const typeIcon = (type: string) =>
   )
 
 const priorityVariant = (p: string) => (p === "high" ? "destructive" : p === "medium" ? "secondary" : "outline")
+
+/** The very first thing a farmer sees on a treatment card: which of the three sources produced it. */
+function SourceBanner({ source }: { source?: ApiRec["recommendationSource"] }) {
+  if (source === "gemini") {
+    return (
+      <div className="flex items-center gap-2 bg-gradient-to-r from-emerald-600 to-emerald-500 px-4 py-2.5 text-white">
+        <Sparkles className="h-4 w-4 shrink-0" />
+        <span className="text-sm font-bold tracking-wide">AI-enhanced by Gemini</span>
+      </div>
+    )
+  }
+  if (source === "ml-fallback") {
+    return (
+      <div className="flex items-center gap-2 bg-amber-100 px-4 py-2.5 text-amber-900">
+        <CloudOff className="h-4 w-4 shrink-0" />
+        <span className="text-sm font-bold tracking-wide">Gemini unavailable — showing the ML recommendation</span>
+      </div>
+    )
+  }
+  return (
+    <div className="flex items-center gap-2 bg-slate-100 px-4 py-2.5 text-slate-600">
+      <Cpu className="h-4 w-4 shrink-0" />
+      <span className="text-sm font-bold tracking-wide">Offline ML model</span>
+    </div>
+  )
+}
+
+/** One piece of sensor/weather evidence, shown as a small labeled pill rather than a sentence. */
+function EvidenceChip({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
+      <div className="text-slate-400">{icon}</div>
+      <div className="min-w-0">
+        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{label}</p>
+        <p className="truncate text-sm font-bold text-slate-800">{value}</p>
+      </div>
+    </div>
+  )
+}
+
+/** Builds the evidence-chip list for a treatment card from its structured sensor/weather fields. */
+function buildEvidence(rec: ApiRec) {
+  const chips: { key: string; icon: React.ReactNode; label: string; value: string }[] = []
+  if (rec.soilMoisturePct != null) {
+    chips.push({ key: "soil", icon: <Droplets className="h-4 w-4" />, label: "Soil moisture", value: `${Math.round(rec.soilMoisturePct)}%` })
+  }
+  if (rec.temperatureC != null) {
+    chips.push({ key: "temp", icon: <Thermometer className="h-4 w-4" />, label: "Temperature", value: `${Math.round(rec.temperatureC)}°C` })
+  }
+  if (rec.humidityPct != null) {
+    chips.push({ key: "humidity", icon: <Droplet className="h-4 w-4" />, label: "Humidity", value: `${Math.round(rec.humidityPct)}%` })
+  }
+  if (rec.vpdKpa != null) {
+    chips.push({ key: "vpd", icon: <Gauge className="h-4 w-4" />, label: "VPD", value: `${rec.vpdKpa} kPa${rec.vpdBand ? ` · ${rec.vpdBand}` : ""}` })
+  }
+  if (rec.windSpeedKmh != null) {
+    chips.push({ key: "wind", icon: <Wind className="h-4 w-4" />, label: "Wind", value: `${Math.round(rec.windSpeedKmh)} km/h` })
+  }
+  if (rec.weatherDescription) {
+    chips.push({
+      key: "weather",
+      icon: <CloudRain className="h-4 w-4" />,
+      label: "Weather",
+      value: rec.nextRainHours != null ? `${rec.weatherDescription} · rain ~${rec.nextRainHours}h` : rec.weatherDescription,
+    })
+  }
+  if (rec.spreadLeverage != null && rec.spreadLeverage > 0) {
+    chips.push({ key: "spread", icon: <TrendingUp className="h-4 w-4" />, label: "Spread risk", value: `~${rec.spreadLeverage.toFixed(1)} infections` })
+  }
+  return chips
+}
 
 function formatScanTime(iso?: string) {
   if (!iso) return null
@@ -322,18 +435,44 @@ export default function Recommendations() {
         ? "text-amber-600"
         : "text-green-600"
 
-  const renderCard = (rec: ApiRec) => {
+  const actionButtonRow = (rec: ApiRec, actionBlocked: boolean, actionLabel: string) => (
+    <div className="flex flex-wrap items-center gap-2 pt-1">
+      <Button
+        onClick={() => implement(rec)}
+        disabled={implementing === rec.id || actionBlocked}
+        className="bg-[#3a7d44] text-white hover:bg-[#2e6336]"
+      >
+        {implementing === rec.id ? (
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+        ) : rec.kind === "treatment" ? (
+          <Zap className="mr-2 h-4 w-4" />
+        ) : (
+          <Droplets className="mr-2 h-4 w-4" />
+        )}
+        {actionLabel}
+      </Button>
+      <Button
+        variant="outline"
+        className="bg-transparent"
+        onClick={() => {
+          setSelectedRec(rec)
+          setIsDetailsOpen(true)
+        }}
+      >
+        Details
+      </Button>
+    </div>
+  )
+
+  // Irrigation and crop-review cards are procedural/safety-gate cards that
+  // never go through Gemini — kept exactly as the original single layout.
+  const renderSimpleCard = (rec: ApiRec) => {
     const actionBlocked = rec.kind === "irrigation" && rec.weatherGated
-    const actionLabel = rec.kind === "treatment"
-        ? rec.weatherGated ? "Review spray safety" : "Open spray plan"
-        : rec.kind === "irrigation"
-          ? actionBlocked ? "Weather hold" : "Queue water pulse"
-          : "Review response"
+    const actionLabel = rec.kind === "irrigation" ? (actionBlocked ? "Weather hold" : "Queue water pulse") : "Review response"
 
     return (
-    <Card key={rec.id} className="relative shadow-sm transition-all duration-300 hover:shadow-md">
-      <CardHeader>
-        <div className="flex items-start justify-between gap-3">
+      <Card key={rec.id} className="relative shadow-sm transition-all duration-300 hover:shadow-md">
+        <CardHeader>
           <div className="flex items-start gap-3">
             <div className={`rounded-lg p-2 ${typeColor(rec.type)}`}>{typeIcon(rec.type)}</div>
             <div className="flex-1">
@@ -359,79 +498,192 @@ export default function Recommendations() {
               )}
             </div>
           </div>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid gap-4 md:grid-cols-3">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">{rec.confidenceBasis}</span>
-              <span className="font-medium">{rec.confidence}%</span>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">{rec.confidenceBasis}</span>
+                <span className="font-medium">{rec.confidence}%</span>
+              </div>
+              <Progress value={rec.confidence} className="h-2" />
             </div>
-            <Progress value={rec.confidence} className="h-2" />
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Recommended timing</p>
+              <p className="text-sm font-medium text-slate-800">{rec.timing}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Estimated impact</p>
+              <p className="text-sm font-medium text-slate-800">{rec.estimatedImpact}</p>
+            </div>
           </div>
-          <div className="space-y-1">
-            <p className="text-sm text-muted-foreground">Recommended timing</p>
-            <p className="text-sm font-medium text-slate-800">{rec.timing}</p>
+
+          <Separator />
+
+          <div className="space-y-2">
+            <h4 className="flex items-center gap-2 text-sm font-medium">
+              <Brain className="h-4 w-4 text-green-600" />
+              Why this recommendation
+            </h4>
+            <ul className="space-y-1.5">
+              {rec.reasoning.map((line, i) => (
+                <li key={i} className="flex items-start gap-2 text-sm text-slate-600">
+                  <div className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-green-500" />
+                  {line}
+                </li>
+              ))}
+            </ul>
           </div>
-          <div className="space-y-1">
-            <p className="text-sm text-muted-foreground">Estimated impact</p>
-            <p className="text-sm font-medium text-slate-800">{rec.estimatedImpact}</p>
+
+          <div className="rounded-xl border border-green-100 bg-green-50/60 p-3">
+            <p className="text-xs font-bold uppercase tracking-wide text-green-700">Action</p>
+            <p className="mt-0.5 text-sm font-semibold text-[#1a2e1d]">{rec.action}</p>
           </div>
-        </div>
 
-        <Separator />
-
-        <div className="space-y-2">
-          <h4 className="flex items-center gap-2 text-sm font-medium">
-            <Brain className="h-4 w-4 text-green-600" />
-            Why this recommendation
-          </h4>
-          <ul className="space-y-1.5">
-            {rec.reasoning.map((line, i) => (
-              <li key={i} className="flex items-start gap-2 text-sm text-slate-600">
-                <div className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-green-500" />
-                {line}
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <div className="rounded-xl border border-green-100 bg-green-50/60 p-3">
-          <p className="text-xs font-bold uppercase tracking-wide text-green-700">Action</p>
-          <p className="mt-0.5 text-sm font-semibold text-[#1a2e1d]">{rec.action}</p>
-        </div>
-
-        <div className="flex items-center gap-2 pt-1">
-          <Button
-            onClick={() => implement(rec)}
-            disabled={implementing === rec.id || actionBlocked}
-            className="bg-[#3a7d44] text-white hover:bg-[#2e6336]"
-          >
-            {implementing === rec.id ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : rec.kind === "treatment" ? (
-              <Zap className="mr-2 h-4 w-4" />
-            ) : (
-              <Droplets className="mr-2 h-4 w-4" />
-            )}
-            {actionLabel}
-          </Button>
-          <Button
-            variant="outline"
-            className="bg-transparent"
-            onClick={() => {
-              setSelectedRec(rec)
-              setIsDetailsOpen(true)
-            }}
-          >
-            Details
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+          {actionButtonRow(rec, actionBlocked, actionLabel)}
+        </CardContent>
+      </Card>
     )
   }
+
+  // Treatment recommendations (and the non-curable "cultural management only"
+  // preventive cards) always carry a recommendationSource — this is the rich,
+  // farmer-facing card: source banner first, then the ML diagnosis (always
+  // ground truth), then either Gemini's focal recommendation panel or the
+  // plain ML/fallback guidance, then supporting sensor/weather evidence.
+  const renderTreatmentCard = (rec: ApiRec) => {
+    const isGemini = rec.recommendationSource === "gemini"
+    const isFallback = rec.recommendationSource === "ml-fallback"
+    const llm = rec.llm
+    const actionBlocked = false
+    const actionLabel = rec.kind === "treatment" ? (rec.weatherGated ? "Review spray safety" : "Open spray plan") : "Review response"
+    const evidence = buildEvidence(rec)
+
+    return (
+      <Card key={rec.id} className="overflow-hidden shadow-sm transition-all duration-300 hover:shadow-md">
+        <SourceBanner source={rec.recommendationSource} />
+        <CardContent className="space-y-5 p-5">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge className="bg-[#1a2e1d] px-3 py-1 text-sm text-white hover:bg-[#1a2e1d]">
+              <MapPin className="mr-1 h-3.5 w-3.5" />
+              Zone {rec.zone}
+            </Badge>
+            <Badge variant={priorityVariant(rec.priority) as any} className="px-3 py-1 text-sm capitalize">
+              {rec.severity} severity
+            </Badge>
+            {rec.weatherGated && (
+              <Badge variant="outline" className="border-amber-300 bg-amber-50 px-3 py-1 text-sm text-amber-700">
+                <CloudRain className="mr-1 h-3.5 w-3.5" />
+                Weather hold
+              </Badge>
+            )}
+            {rec.scannedAt && formatScanTime(rec.scannedAt) && (
+              <span className="ml-auto text-xs text-muted-foreground">Scanned {formatScanTime(rec.scannedAt)}</span>
+            )}
+          </div>
+
+          {/* ML diagnosis — always shown, always ground truth, never overwritten by Gemini. */}
+          <div>
+            <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-400">
+              <ShieldCheck className="h-3.5 w-3.5" /> ML diagnosis
+            </p>
+            <h3 className="mt-0.5 text-2xl font-black leading-tight text-[#1a2e1d]">{rec.disease || rec.title}</h3>
+            <p className="mt-1 text-sm text-slate-600">{rec.description}</p>
+            <div className="mt-2 flex items-center gap-3">
+              <Progress value={rec.confidence} className="h-2 w-32" />
+              <span className="text-sm font-bold text-slate-700">{rec.confidence}% confidence</span>
+            </div>
+            {rec.chemical && (
+              <p className="mt-2 text-sm text-slate-700">
+                <span className="font-bold text-[#1a2e1d]">ML-verified treatment:</span> {rec.chemical}
+                {rec.dosage ? ` · ${rec.dosage}` : ""}
+              </p>
+            )}
+          </div>
+
+          {isGemini && llm ? (
+            <div className="space-y-3 rounded-2xl border-2 border-emerald-200 bg-emerald-50/70 p-4">
+              <p className="flex items-center gap-2 text-xs font-black uppercase tracking-wide text-emerald-700">
+                <Sparkles className="h-4 w-4" /> Gemini recommends
+              </p>
+              <p className="text-lg font-bold leading-snug text-[#1a2e1d]">{llm.recommended_action}</p>
+              <p className="text-sm text-slate-700">{llm.treatment}</p>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-emerald-700">Why</p>
+                <p className="mt-0.5 text-sm text-slate-700">{llm.reasoning}</p>
+              </div>
+              {llm.safety_notes && (
+                <div className="flex items-start gap-2 rounded-xl bg-amber-100/80 p-2.5">
+                  <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
+                  <p className="text-sm text-amber-900">{llm.safety_notes}</p>
+                </div>
+              )}
+              {rec.photoNames && rec.photoNames.length > 0 && (
+                <div>
+                  <p className="mb-1.5 flex items-center gap-1 text-xs font-bold uppercase tracking-wide text-emerald-700">
+                    <ImageIcon className="h-3.5 w-3.5" /> Leaf photo{rec.photoNames.length > 1 ? "s" : ""} used
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {rec.photoNames.map((name) => (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        key={name}
+                        src={`/api/leaf-photos/${name}`}
+                        alt="Scanned leaf"
+                        className="h-20 w-20 rounded-lg border border-emerald-200 object-cover"
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className={`space-y-2 rounded-2xl border p-4 ${isFallback ? "border-amber-200 bg-amber-50/60" : "border-slate-100 bg-slate-50"}`}>
+              <p className="text-sm font-semibold text-[#1a2e1d]">{rec.action}</p>
+              {isFallback && (
+                <p className="text-xs text-amber-800">Gemini couldn't be reached just now — this is the standard offline recommendation, unaffected by that.</p>
+              )}
+              {rec.photoNames && rec.photoNames.length > 0 && (
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {rec.photoNames.map((name) => (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img key={name} src={`/api/leaf-photos/${name}`} alt="Scanned leaf" className="h-16 w-16 rounded-lg border border-slate-200 object-cover" />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {!isGemini && (
+            <ul className="space-y-1.5">
+              {rec.reasoning.map((line, i) => (
+                <li key={i} className="flex items-start gap-2 text-sm text-slate-600">
+                  <div className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-green-500" />
+                  {line}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {evidence.length > 0 && (
+            <div>
+              <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">Supporting evidence</p>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+                {evidence.map((chip) => (
+                  <EvidenceChip key={chip.key} icon={chip.icon} label={chip.label} value={chip.value} />
+                ))}
+                <EvidenceChip icon={<Clock className="h-4 w-4" />} label="Timing" value={isGemini && llm ? llm.timing : rec.timing} />
+              </div>
+            </div>
+          )}
+
+          {actionButtonRow(rec, actionBlocked, actionLabel)}
+        </CardContent>
+      </Card>
+    )
+  }
+
+  const renderCard = (rec: ApiRec) => (rec.recommendationSource ? renderTreatmentCard(rec) : renderSimpleCard(rec))
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-6">
@@ -510,9 +762,20 @@ export default function Recommendations() {
           <Card className="overflow-hidden border-emerald-200 bg-gradient-to-r from-emerald-950 via-[#245f31] to-[#3a7d44] text-white shadow-lg">
             <CardContent className="flex flex-col gap-4 p-5 md:flex-row md:items-center md:justify-between">
               <div>
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-200">Top containment priority · model projection</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-200">Top containment priority</p>
+                  {priorityTreatment.recommendationSource === "gemini" && (
+                    <Badge className="border-0 bg-white/20 px-2 py-0.5 text-[10px] font-bold text-white hover:bg-white/20">
+                      <Sparkles className="mr-1 h-3 w-3" /> AI-enhanced by Gemini
+                    </Badge>
+                  )}
+                </div>
                 <h2 className="mt-1 text-2xl font-black">{priorityTreatment.title}</h2>
-                <p className="mt-1 max-w-3xl text-sm text-emerald-50">{priorityTreatment.action}</p>
+                <p className="mt-1 max-w-3xl text-sm text-emerald-50">
+                  {priorityTreatment.recommendationSource === "gemini" && priorityTreatment.llm
+                    ? priorityTreatment.llm.recommended_action
+                    : priorityTreatment.action}
+                </p>
                 {priorityTreatment.spreadLeverage != null && priorityTreatment.spreadLeverage > 0 && (
                   <p className="mt-2 text-xs font-semibold text-emerald-100">Containing this zone carries ~{priorityTreatment.spreadLeverage.toFixed(1)} projected secondary-infection leverage over the next five days.</p>
                 )}
@@ -752,6 +1015,19 @@ export default function Recommendations() {
                       Weather hold
                     </Badge>
                   )}
+                  {selectedRec.recommendationSource === "gemini" ? (
+                    <Badge className="border-0 bg-emerald-600 text-white hover:bg-emerald-600">
+                      <Sparkles className="mr-1 h-3 w-3" /> AI-enhanced by Gemini
+                    </Badge>
+                  ) : selectedRec.recommendationSource === "ml-fallback" ? (
+                    <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-700">
+                      Gemini unavailable — ML recommendation
+                    </Badge>
+                  ) : selectedRec.recommendationSource === "ml-offline" ? (
+                    <Badge variant="outline" className="border-slate-300 bg-slate-50 text-slate-600">
+                      Offline ML model
+                    </Badge>
+                  ) : null}
                 </div>
                 <DialogTitle className="text-2xl">{selectedRec.title}</DialogTitle>
                 <DialogDescription className="pt-2 text-base">{selectedRec.description}</DialogDescription>
@@ -795,6 +1071,13 @@ export default function Recommendations() {
                     </p>
                   </div>
                 </div>
+
+                {selectedRec.llm?.safety_notes && (
+                  <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                    <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
+                    <p className="text-sm text-amber-900">{selectedRec.llm.safety_notes}</p>
+                  </div>
+                )}
               </div>
 
               <DialogFooter className="flex flex-col items-center gap-2 sm:flex-row sm:justify-between">
