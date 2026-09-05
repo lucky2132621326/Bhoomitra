@@ -128,7 +128,9 @@ export async function GET() {
     zones: payload,
     farmClimate,
     climatePresentation,
-    weather: weatherContext,
+    weather: weatherContext
+      ? { ...weatherContext, sprayWindow: weatherForecast.derived.sprayWindow }
+      : null,
     stress,
     controller: {
       ...hardwareState,

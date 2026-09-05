@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { readUsers, sanitizeUser, writeUsers } from "@/app/lib/usersStore"
 import { getCurrentUser } from "@/app/lib/session"
+import { SUPPORTED_LANGUAGES, type Language } from "@/lib/language-context"
 
 /** Update the signed-in user's own profile (safe fields only). */
 export async function PUT(req: Request) {
@@ -27,7 +28,9 @@ export async function PUT(req: Request) {
     const editable: Record<string, unknown> = {}
     if (typeof body.name === "string" && body.name.trim()) editable.name = body.name.trim()
     if (typeof body.location === "string") editable.location = body.location.trim()
-    if (body.language === "en" || body.language === "hi") editable.language = body.language
+    if (typeof body.language === "string" && SUPPORTED_LANGUAGES.includes(body.language as Language)) {
+      editable.language = body.language
+    }
     // Email is only settable if the account doesn't already have one (phone signups).
     if (typeof body.email === "string" && body.email.trim() && !users[index].email) {
       editable.email = body.email.trim().toLowerCase()

@@ -43,3 +43,16 @@ Regression checks (no real history records are written):
 pest_ml_service/.venv/bin/python -m unittest discover -s pest_ml_service -p 'test_*.py'
 node scripts/test-pest-followups.cjs
 ```
+# Classifier fallback
+
+When both YOLO passes return no boxes, the service tries the existing 19-class
+TorchScript model (`models/pest_detector.pt` and `models/class_names.json`). It
+uses the original 224px RGB stretch and ImageNet normalization. A top score of
+at least 0.70 and a top-two margin of at least 0.20 are required. These are
+conservative starting gates, not a guarantee of correctness or calibrated probabilities.
+
+Classifier-only observations expose `identificationSource: classifier` and no
+boxes or pressure. The application displays the pest name with a classifier
+source label, purple zones, unknown pressure, and no visible count. Confidence
+stays private. Such observations cannot establish improvement or pesticide
+eligibility. Missing/broken fallback weights leave the scan inconclusive.

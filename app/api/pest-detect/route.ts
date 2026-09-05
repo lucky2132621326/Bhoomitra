@@ -161,11 +161,12 @@ export async function POST(request: Request) {
       }, { status: response.status === 400 || response.status === 413 ? response.status : 503 })
     }
 
+    const classifierOnly = modelBody?.identificationSource === "classifier"
     const modelDetails = {
       modelId: String(modelBody?.modelId || "bhoomitra_pest_detector_yolo26_v1"),
       modelVersion: String(modelBody?.modelVersion || "1.0.0"),
       ready: true,
-      task: "object-detection",
+      task: classifierOnly ? "image-classification" : "object-detection",
     }
     const timestamp = new Date().toISOString()
     const image = {
@@ -273,12 +274,12 @@ export async function POST(request: Request) {
     const confidence = primary.confidence
     const band = confidenceBand(confidence)
     const cropMatch = cropIsSupported(primaryKnowledge, crop) ? "matched" as const : "review" as const
-    const identityNeedsReview = confidence < IDENTITY_CONFIDENCE_GATE
-    const pressureLevel = (["low", "moderate", "high"].includes(modelBody?.pressure?.level)
+    const identityNeedsReview = classifierOnly || confidence < IDENTITY_CONFIDENCE_GATE
+    const pressureLevel = (classifierOnly ? "unknown" : ["low", "moderate", "high"].includes(modelBody?.pressure?.level)
       ? modelBody.pressure.level
-      : "low") as "low" | "moderate" | "high"
-    const visibleCount = Math.round(positiveNumber(modelBody?.pressure?.visibleCount ?? primary.count))
-    const boxCoverageRatio = clamp(modelBody?.pressure?.boxCoverageRatio ?? primary.boxCoverageRatio)
+      : "low") as "low" | "moderate" | "high" | "unknown"
+    const visibleCount = classifierOnly ? 0 : Math.round(positiveNumber(modelBody?.pressure?.visibleCount ?? primary.count))
+    const boxCoverageRatio = classifierOnly ? 0 : clamp(modelBody?.pressure?.boxCoverageRatio ?? primary.boxCoverageRatio)
     const chemicalBlockedReason = identityNeedsReview
       ? "Retake the photo or obtain expert confirmation before selecting a pesticide."
       : cropMatch === "review"
@@ -288,6 +289,7 @@ export async function POST(request: Request) {
     const result = {
       success: true,
       detected: true,
+      identificationSource: classifierOnly ? "classifier" as const : "detector" as const,
       persisted: true,
       model: modelDetails,
       inference,

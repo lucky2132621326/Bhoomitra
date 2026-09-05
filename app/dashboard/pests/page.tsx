@@ -6,6 +6,7 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { usePestText } from "@/components/pest-zone-copy"
+import { localeFor } from "@/lib/language-context"
 import { PestZoneResult, zoneColours, zoneLabels } from "@/components/pest-zone-result"
 import { zoneState, type PestZoneObservation, type PestZoneState } from "@/lib/pest-zone-types"
 
@@ -184,10 +185,10 @@ export default function PestDetectionPage() {
             const latest = latestByZone.get(id)
             const state = zoneState(latest)
             const label = !latest && historyError ? "History unavailable" : !latest && historyLoading ? "Loading zone history…" : zoneLabels[state]
-            return <button key={id} type="button" disabled={loading || (historyLoading && !latest)} aria-label={text("Zone") + " " + id + ": " + text(label) + ". " + text(latest ? "View result" : "Select zone")} aria-pressed={zone === id} onClick={() => chooseZone(id, true)} className={"flex min-h-32 w-full min-w-0 flex-col items-center justify-center gap-2 rounded-2xl border-2 p-2 text-center shadow-sm transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-green-800 disabled:opacity-60 " + zoneColours[state] + (zone === id ? " ring-4 ring-green-800 ring-offset-2" : "")}><span className="text-2xl font-extrabold">{id}</span><span className="text-sm font-semibold leading-5">{text(label)}</span>{latest && <span className="text-xs font-medium">{new Date(latest.result.scan.timestamp).toLocaleDateString(language === "hi" ? "hi-IN" : "en-IN", { day: "numeric", month: "short" })}</span>}</button>
+            return <button key={id} type="button" disabled={loading || (historyLoading && !latest)} aria-label={text("Zone") + " " + id + ": " + text(label) + ". " + text(latest ? "View result" : "Select zone")} aria-pressed={zone === id} onClick={() => chooseZone(id, true)} className={"flex min-h-32 w-full min-w-0 flex-col items-center justify-center gap-2 rounded-2xl border-2 p-2 text-center shadow-sm transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-green-800 disabled:opacity-60 " + zoneColours[state] + (zone === id ? " ring-4 ring-green-800 ring-offset-2" : "")}><span className="text-2xl font-extrabold">{id}</span><span className="text-sm font-semibold leading-5">{text(label)}</span>{latest && <span className="text-xs font-medium">{new Date(latest.result.scan.timestamp).toLocaleDateString(localeFor(language), { day: "numeric", month: "short" })}</span>}</button>
           })}
         </div>
-        <div className="mt-6 flex flex-wrap gap-x-5 gap-y-3 border-t border-slate-100 pt-5">{(["high", "moderate", "low", "clear", "recheck", "untested"] as PestZoneState[]).map((state) => <span key={state} className="flex items-center gap-2 text-sm font-medium"><span className={"h-4 w-4 rounded border " + zoneColours[state]} />{text(zoneLabels[state])}</span>)}</div>
+        <div className="mt-6 flex flex-wrap gap-x-5 gap-y-3 border-t border-slate-100 pt-5">{(["high", "moderate", "low", "unmeasured", "clear", "recheck", "untested"] as PestZoneState[]).map((state) => <span key={state} className="flex items-center gap-2 text-sm font-medium"><span className={"h-4 w-4 rounded border " + zoneColours[state]} />{text(zoneLabels[state])}</span>)}</div>
         <p className="mt-5 rounded-2xl bg-slate-50 p-4 text-base leading-7 text-slate-600">{text("Colours describe the latest photo, not the whole zone. Green requires a field check; an uncertain photo stays grey.")}</p>
         <p className="mt-4 text-sm text-slate-500">{text("Use a fresh photo of the same plants to track change.")}</p>
       </section>

@@ -154,10 +154,30 @@ const pestNamesHindi: Record<string, string> = {
   "Sugarcane": "गन्ना", "Vegetables": "सब्जियाँ", "Grape": "अंगूर",
 }
 
+/**
+ * Per-language overlays for pest copy. Hindi carries the full agronomic advice
+ * set; the other languages currently inherit the shared keyed dictionary and
+ * fall back to English for advice strings that have not been translated and
+ * agronomist-reviewed yet. See PEST_ADVICE_COVERAGE below.
+ */
+const pestAdviceByLanguage: Partial<Record<Language, Record<string, string>>> = {
+  hi: pestAdviceHindi,
+}
+
+const pestNamesByLanguage: Partial<Record<Language, Record<string, string>>> = {
+  hi: pestNamesHindi,
+}
+
+/** Languages whose pest agronomic advice has been translated. */
+export const PEST_ADVICE_COVERAGE: Language[] = ["en", "hi"]
+
 export function getPestPhraseMap(language: Language): Record<string, string> {
-  if (language !== "hi") return {}
+  if (language === "en") return {}
   const english = translations.en as Record<string, string>
-  const hindi = translations.hi as Record<string, string>
-  const shared = Object.fromEntries(Object.keys(english).map((key) => [english[key], hindi[key] ?? english[key]]))
-  return { ...shared, ...pestAdviceHindi, ...pestNamesHindi }
+  const target = translations[language] as Record<string, string> | undefined
+  if (!target) return {}
+  // Reverse-lookup: English source text -> translated text, from the keyed
+  // dictionary, so every language picks up shared UI copy automatically.
+  const shared = Object.fromEntries(Object.keys(english).map((key) => [english[key], target[key] ?? english[key]]))
+  return { ...shared, ...(pestAdviceByLanguage[language] ?? {}), ...(pestNamesByLanguage[language] ?? {}) }
 }

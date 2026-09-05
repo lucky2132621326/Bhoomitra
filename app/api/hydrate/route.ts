@@ -5,6 +5,7 @@ import {
   zones,
   irrigationSettings,
   getFarmClimate,
+  setGlobalHydrateRequest,
 } from "../zones/data"
 import { getForecast } from "@/app/lib/weatherService"
 import { decideFarmActions } from "@/app/lib/farmDecisionService"
@@ -15,7 +16,7 @@ import { getCurrentFarmId } from "@/app/lib/farmContext"
 import { estimatePulseLitres } from "@/app/lib/flowModel"
 
 export async function POST(req: Request) {
-  const { zoneId, pulses } = await req.json()
+  const { zoneId, pulses, globalRequest, globalTargetZoneIds } = await req.json()
   
   if (hardwareState.killSwitchEngaged) {
     return NextResponse.json({ message: "Safety kill switch is engaged" }, { status: 423 })
@@ -50,6 +51,20 @@ export async function POST(req: Request) {
       },
       { status: 409 },
     )
+  }
+
+  // A global action still queues one bounded controller command per zone, but
+  // preserves the full target list so the dashboard can explain what the
+  // single shared pump will irrigate.
+  if (globalRequest && Array.isArray(globalTargetZoneIds)) {
+    const targetedZones = globalTargetZoneIds.filter(
+      (id: unknown): id is string => typeof id === "string" && zones.some(zone => zone.id === id),
+    )
+    setGlobalHydrateRequest({
+      requestedAt: new Date().toISOString(),
+      targetedZones,
+      pumpControllerZone: zoneId,
+    })
   }
 
   // Record the estimated irrigation volume in the unified, farmId-stamped

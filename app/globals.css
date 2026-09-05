@@ -1,6 +1,11 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* Explicit roots keep production utilities in sync after moving the checkout. */
+@source "./";
+@source "../components";
+@source "../lib";
+
 @custom-variant dark (&:is(.dark *));
 
 /* Zone results must cover the fixed sidebar and the global language control. */

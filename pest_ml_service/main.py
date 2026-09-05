@@ -131,6 +131,34 @@ def image_pressure(visible_count: int, coverage_ratio: float) -> dict[str, Any]:
     }
 
 
+def classifier_fallback(image: Image.Image):
+    """Identity-only fallback. Never synthesize boxes, counts or pressure."""
+    import torch
+    key = "classifier_fallback_v1"
+    if key not in _model_cache:
+        model = torch.jit.load(os.path.join(BASE_DIR, "models/pest_detector.pt"), map_location="cpu")
+        model.eval()
+        with open(os.path.join(BASE_DIR, "models/class_names.json"), encoding="utf-8") as handle:
+            labels = json.load(handle)
+        _model_cache[key] = (model, labels)
+    model, labels = _model_cache[key]
+    resized = image.resize((224, 224), Image.Resampling.BILINEAR)
+    array = np.asarray(resized, dtype=np.float32) / 255.0
+    array = (array - np.array([0.485, 0.456, 0.406], dtype=np.float32)) / np.array([0.229, 0.224, 0.225], dtype=np.float32)
+    tensor = torch.from_numpy(array.transpose(2, 0, 1).copy()).unsqueeze(0)
+    with torch.inference_mode():
+        logits = model(tensor)
+        if logits.shape != (1, len(labels)) or not torch.isfinite(logits).all():
+            raise ValueError("Classifier output does not match its label file")
+        scores = torch.softmax(logits, dim=1)[0]
+    ranked = scores.argsort(descending=True)
+    first, second = int(ranked[0]), int(ranked[1])
+    # Conservative starting gate, not a calibrated correctness guarantee.
+    if float(scores[first]) < 0.70 or float(scores[first] - scores[second]) < 0.20:
+        return None
+    return {"classId": first, "label": labels[first], "confidence": float(scores[first])}
+
+
 def model_status() -> dict[str, Any]:
     config = active_config()
     model_path = resolve_path(config, "model_path", "PEST_MODEL_PATH")
@@ -257,22 +285,33 @@ def predict():
     summaries.sort(key=lambda item: (item["confidence"], item["count"]), reverse=True)
 
     primary = summaries[0] if summaries else None
+    source = "detector"
+    if primary is None:
+        try:
+            primary = classifier_fallback(image)
+        except Exception:
+            app.logger.exception("Classifier fallback unavailable; retaining inconclusive result")
+            inference["fallbackUnavailable"] = True
+        if primary is not None:
+            source = "classifier"
+            summaries = [primary]
     primary_detections = [item for item in detections if primary and item["classId"] == primary["classId"]]
     visible_count = len(primary_detections)
     coverage_ratio = min(1.0, sum(float(item["areaRatio"]) for item in primary_detections))
 
     return jsonify(
         {
-            "modelId": config.get("model_id"),
+            "modelId": "bhoomitra_pest_classifier_v1" if source == "classifier" else config.get("model_id"),
             "modelVersion": config.get("model_version"),
-            "task": "object-detection",
+            "task": "image-classification" if source == "classifier" else "object-detection",
+            "identificationSource": source,
             "image": {"width": source_width, "height": source_height},
             "detected": primary is not None,
             "inference": inference,
             "primaryPrediction": primary,
             "predictions": summaries[:3],
             "detections": detections,
-            "pressure": image_pressure(visible_count, coverage_ratio) if primary else None,
+            "pressure": image_pressure(visible_count, coverage_ratio) if primary and source == "detector" else None,
             "limitations": "Counts and bounding boxes apply only to visible pests in this photo; they do not estimate whole-field severity.",
         }
     )
