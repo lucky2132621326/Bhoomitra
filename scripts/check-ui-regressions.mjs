@@ -71,6 +71,36 @@ check(
   "active-detection copy must be rendered from translation keys",
 )
 
+// --- Five-language support -------------------------------------------------
+// A merge once silently narrowed these back to English + Hindi, which stranded
+// Marathi/Tamil/Telugu farmers on English without any test failing.
+const LANGS = ["en", "hi", "mr", "ta", "te"]
+const languageContext = readFileSync("lib/language-context.tsx", "utf8")
+const selector = readFileSync("components/language-selector.tsx", "utf8")
+
+for (const lang of LANGS) {
+  check(
+    new RegExp(`export type Language =[^\\n]*"${lang}"`).test(languageContext),
+    `Language union must include "${lang}"`,
+  )
+  check(
+    new RegExp(`SUPPORTED_LANGUAGES[^\\n]*"${lang}"`).test(languageContext),
+    `SUPPORTED_LANGUAGES must include "${lang}"`,
+  )
+  check(
+    new RegExp(`code: "${lang}"`).test(selector),
+    `the language selector must offer "${lang}"`,
+  )
+  check(
+    new RegExp(`\\b${lang}: "`).test(languageContext),
+    `LOCALE_BY_LANGUAGE must map "${lang}" to a locale`,
+  )
+}
+check(
+  !/language === "hi" \? "hi-IN"/.test(languageContext + selector),
+  "locale selection must go through localeFor(), not a two-language ternary",
+)
+
 if (failures) {
   console.error(`\n${failures} UI regression check failure(s)`)
   process.exit(1)

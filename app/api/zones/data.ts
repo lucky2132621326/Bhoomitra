@@ -645,6 +645,29 @@ export function enqueueCommand(zoneId: string, command: "spray" | "water" | "sto
 }
 
 /**
+ * Cancel water commands that have not reached the controller yet. Active pump
+ * work is deliberately not interrupted here; it must finish or be stopped by
+ * the hardware safety control.
+ */
+export function clearPendingIrrigationQueue() {
+  const clearedZoneIds: string[] = []
+
+  for (const [zoneId, queue] of Object.entries(pendingCommands)) {
+    const remaining = queue.filter(command => command !== "water")
+    if (remaining.length !== queue.length) clearedZoneIds.push(zoneId)
+
+    if (remaining.length > 0) {
+      pendingCommands[zoneId] = remaining
+    } else {
+      delete pendingCommands[zoneId]
+    }
+  }
+
+  setGlobalHydrateRequest(null)
+  return { clearedZoneIds }
+}
+
+/**
  * Move a queued command into the controller's active state. A command leaves
  * `pendingCommands` only when the controller polls it, not merely because the
  * dashboard asked for it.

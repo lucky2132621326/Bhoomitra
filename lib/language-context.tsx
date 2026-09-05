@@ -2,16 +2,29 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react"
 
-export type Language = "en" | "hi"
+export type Language = "en" | "hi" | "mr" | "ta" | "te"
 
 interface LanguageContextType {
   language: Language
   setLanguage: (lang: Language) => void
 }
 
-export const SUPPORTED_LANGUAGES: Language[] = ["en", "hi"]
+export const SUPPORTED_LANGUAGES: Language[] = ["en", "hi", "mr", "ta", "te"]
 
 export const LANGUAGE_STORAGE_KEY = "bhoomitra_language"
+
+/** BCP-47 locales for Intl formatting and speech synthesis. */
+export const LOCALE_BY_LANGUAGE: Record<Language, string> = {
+  en: "en-IN",
+  hi: "hi-IN",
+  mr: "mr-IN",
+  ta: "ta-IN",
+  te: "te-IN",
+}
+
+export function localeFor(language: Language): string {
+  return LOCALE_BY_LANGUAGE[language] ?? "en-IN"
+}
 
 export function isLanguage(value: unknown): value is Language {
   return typeof value === "string" && (SUPPORTED_LANGUAGES as string[]).includes(value)

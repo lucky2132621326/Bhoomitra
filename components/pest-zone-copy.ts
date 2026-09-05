@@ -1,7 +1,10 @@
 "use client"
 
 import { useMemo } from "react"
-import { useLanguage } from "@/lib/language-context"
+import { useLanguage, type Language } from "@/lib/language-context"
+import { pestZoneMarathi } from "@/components/pest-zone-copy-mr"
+import { pestZoneTamil } from "@/components/pest-zone-copy-ta"
+import { pestZoneTelugu } from "@/components/pest-zone-copy-te"
 import { getPestPhraseMap } from "@/lib/pest-phrase-map"
 
 const hindi: Record<string, string> = {
@@ -120,8 +123,19 @@ const hindi: Record<string, string> = {
   "visible": "दिखे",
 }
 
+/** Per-language screen copy, keyed by the English source string. */
+const overlays: Partial<Record<Language, Record<string, string>>> = {
+  hi: hindi,
+  mr: pestZoneMarathi,
+  ta: pestZoneTamil,
+  te: pestZoneTelugu,
+}
+
 export function usePestText() {
   const { language } = useLanguage()
-  const map = useMemo(() => ({ ...getPestPhraseMap(language), ...(language === "hi" ? hindi : {}) }), [language])
+  const map = useMemo(
+    () => ({ ...getPestPhraseMap(language), ...(overlays[language] ?? {}) }),
+    [language],
+  )
   return { language, text: (value: string) => map[value] ?? value }
 }

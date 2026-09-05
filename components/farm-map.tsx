@@ -146,6 +146,11 @@ type FarmWeather = {
   totalRain24h: number | null
   rainProbabilityNextHours: number | null
   reason: string
+  sprayWindow?: {
+    safeNow: boolean
+    nextSafeInHours: number | null
+    reason: string
+  }
 }
 
 interface ZonesApiResponse {
@@ -209,6 +214,56 @@ function getFarmVpdStatus(climate: FarmClimatePresentation | null) {
   return `Too dry or hot for the configured spray window${referenceSuffix}`
 }
 
+function getFarmerSprayGuidance(
+  spray: SprayDecision | undefined,
+  climate: FarmClimatePresentation,
+  weather: FarmWeather | null,
+) {
+  const optimalBand = "0.8–1.2 kPa"
+  const weatherWindow = weather?.sprayWindow
+  const timing = !weatherWindow
+    ? "Forecast timing is unavailable. Recheck conditions later."
+    : weatherWindow.safeNow
+      ? "Best weather window: now. Confirm the live VPD is in range before starting."
+      : weatherWindow.nextSafeInHours !== null
+        ? `Next dry, low-wind weather window: in about ${weatherWindow.nextSafeInHours} hour${weatherWindow.nextSafeInHours === 1 ? "" : "s"}. Recheck live VPD immediately before spraying.`
+        : "No dry, low-wind weather window is forecast in the next 48 hours."
+
+  if (spray?.allowed) {
+    return {
+      title: "Spray now",
+      tone: "border-emerald-200 bg-emerald-50 text-emerald-900",
+      action: `Conditions are suitable. Spray only while live VPD remains in the optimal ${optimalBand} band.`,
+      timing,
+    }
+  }
+
+  if (!climate.isLive) {
+    return {
+      title: "Do not spray yet",
+      tone: "border-amber-200 bg-amber-50 text-amber-900",
+      action: `Wait for a fresh farm-sensor reading. Spray only when live VPD is ${optimalBand}, with dry and calm weather.`,
+      timing,
+    }
+  }
+
+  if (climate.vpdBand !== "green") {
+    return {
+      title: "Wait for better VPD",
+      tone: "border-amber-200 bg-amber-50 text-amber-900",
+      action: `Do not spray at ${climate.vpd.toFixed(2)} kPa. Wait until VPD reaches the optimal ${optimalBand} band.`,
+      timing,
+    }
+  }
+
+  return {
+    title: "Do not spray yet",
+    tone: "border-amber-200 bg-amber-50 text-amber-900",
+    action: `${spray?.reason || "Current spray conditions are not suitable."} Keep VPD in the optimal ${optimalBand} band.`,
+    timing,
+  }
+}
+
 function WeatherStatTile({
   icon,
   label,
@@ -250,6 +305,7 @@ export default function FarmMap() {
   const [isZoneDetailsOpen, setIsZoneDetailsOpen] = useState(false)
   const [isHydrating, setIsHydrating] = useState(false)
   const [isIrrigatingAll, setIsIrrigatingAll] = useState(false)
+  const [isClearingIrrigationQueue, setIsClearingIrrigationQueue] = useState(false)
   const [isIrrigateConfirmOpen, setIsIrrigateConfirmOpen] = useState(false)
   const [irrigateNotice, setIrrigateNotice] = useState<string | null>(null)
   const [controlNotice, setControlNotice] = useState<string | null>(null)
@@ -287,6 +343,17 @@ export default function FarmMap() {
   // Per-zone projected spread leverage (infections avoided by containing that
   // zone), sourced from the real spread model via /api/recommendations.
   const [zoneLeverage, setZoneLeverage] = useState<Record<string, number>>({})
+
+  // The action briefing is a focused decision surface. Keep the map behind it
+  // fixed so a wheel/touch gesture never scrolls the background instead.
+  useEffect(() => {
+    if (!isRecommendationOpen) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [isRecommendationOpen])
 
   useEffect(() => {
     const fetchQueue = async () => {
@@ -591,17 +658,14 @@ export default function FarmMap() {
           ? t("map.action.monitorAfterRain", { zone: zoneLabel })
           : t("map.action.monitor", { zone: zoneLabel })
 
+    // Keep the briefing farmer-focused: one soil-status reason and one clear
+    // record of whether this zone has already been watered today.
     const reasons = [
       zone.soilMoisture <= 25
         ? t("map.reason.criticallyLow")
         : zone.soilMoisture < irrigationMeta.dryThreshold
           ? t("map.reason.belowTarget")
           : t("map.reason.safeBand"),
-      irrigationDecision?.reason || t("map.reason.weatherLoading"),
-      displayClimate.message,
-      hasPrototypePump
-        ? tPlural("map.reason.pulsesAvailable", pulsePlan.pulses)
-        : t("map.reason.mapMonitorOnly"),
       zone.lastIrrigated && new Date(zone.lastIrrigated).toDateString() === new Date().toDateString()
         ? t("map.reason.pulseRecordedToday")
         : t("map.reason.noIrrigationToday"),
@@ -628,6 +692,10 @@ export default function FarmMap() {
     PUMP_CALIBRATED && FLOW_CALIBRATED && selectedZonePulseLitres != null ? ` (≈${selectedZonePulseLitres.toFixed(1)} L)` : ""
   const estPulses = selectedZonePulsePlan?.pulses || 1
   const irrigationLoopSubtext = `Target: ${irrigationMeta.wetThreshold}% · 3-second pulses · est. ${estPulses} pulse${estPulses === 1 ? "" : "s"} (max ${MAX_IRRIGATION_PULSES})`
+  const queuedWaterZoneIds = Object.entries(commandQueue)
+    .filter(([, commands]) => commands.includes("water"))
+    .map(([zoneId]) => zoneId)
+  const globalQueueTargets = irrigationMeta.globalHydrateRequest?.targetedZones || []
 
   const farmSummary = {
     irrigationRequired: visibleZones.filter(zone => zone.decisions?.irrigation.action === "irrigate_now").length,
@@ -739,7 +807,7 @@ export default function FarmMap() {
           const response = await fetch("/api/hydrate", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ zoneId, pulses: plan.pulses }),
+            body: JSON.stringify({ zoneId, pulses: plan.pulses, globalRequest: true, globalTargetZoneIds: targets }),
           })
           return { zoneId, ok: response.ok }
         }),
@@ -755,6 +823,51 @@ export default function FarmMap() {
       setIrrigateNotice("Irrigation could not be started — check your connection and try again.")
     } finally {
       setIsIrrigatingAll(false)
+    }
+  }
+
+  const startSelectedZoneIrrigation = async () => {
+    if (!selectedZone || !selectedZoneHasPrototypePump || !selectedZonePulsePlan || !selectedZone.decisions?.irrigation.allowsStart) return
+
+    const confirmed = window.confirm(
+      `Start a bounded irrigation loop on ${getZoneLabel(selectedZone.id)}?\n\n${irrigationLoopSubtext}\n\nThe controller fires 3-second pulses, checks the soil after each one, and stops itself when the zone reaches target — or after ${MAX_IRRIGATION_PULSES} pulses if the sensor stalls. You can cancel anytime.`,
+    )
+    if (!confirmed) return
+
+    setIsHydrating(true)
+    setControlNotice(null)
+    try {
+      const response = await fetch("/api/hydrate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ zoneId: selectedZone.id, pulses: selectedZonePulsePlan.pulses }),
+      })
+      const result = await response.json().catch(() => ({}))
+      setControlNotice(
+        response.ok
+          ? result?.message || t("map.pulsePlanQueued")
+          : result?.message || t("map.pulsesCouldNotQueue"),
+      )
+      await fetchZones()
+    } finally {
+      setIsHydrating(false)
+    }
+  }
+
+  const clearIrrigationQueue = async () => {
+    if (!window.confirm("Clear all pending irrigation commands? Any pump pulse already running will finish safely.")) return
+
+    setIsClearingIrrigationQueue(true)
+    try {
+      const response = await fetch("/api/zones/queue", { method: "POST" })
+      const result = await response.json().catch(() => null)
+      if (response.ok) {
+        setCommandQueue(result?.queue || {})
+        setIrrigateNotice(result?.clearedZoneIds?.length ? `Cleared pending irrigation for ${result.clearedZoneIds.join(", ")}.` : "No pending irrigation commands to clear.")
+        await fetchZones()
+      }
+    } finally {
+      setIsClearingIrrigationQueue(false)
     }
   }
 
@@ -909,7 +1022,7 @@ export default function FarmMap() {
         </Card>
 
         {/* Regional weather (larger share) + Kill Switch (narrower, compact) — same row on desktop, stacks on smaller screens */}
-        <div className="grid gap-5 lg:grid-cols-[2fr_1fr] lg:items-start">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[2fr_1fr] lg:items-start">
           <Card className="flex h-full flex-col border-sky-100 bg-gradient-to-br from-sky-50 via-white to-emerald-50 shadow-sm">
             <CardContent className="flex flex-1 flex-col p-5">
               <div className="flex flex-1 flex-col rounded-xl border border-sky-100 bg-white/85 p-4">
@@ -1092,6 +1205,44 @@ export default function FarmMap() {
 
           <div className="flex flex-col gap-4">
             <HardwareSafetyPanel />
+
+            <Card className="border-violet-200 bg-violet-50/40 shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <ListChecks className="h-5 w-5 text-violet-700" />
+                  Hardware queue
+                </CardTitle>
+                <CardDescription>Commands waiting for the shared pump controller</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-0 text-sm">
+                {queuedWaterZoneIds.length > 0 || globalQueueTargets.length > 0 ? (
+                  <div className="rounded-lg border border-violet-200 bg-white p-3">
+                    <p className="font-bold text-violet-900">
+                      {globalQueueTargets.length > 0 ? "Global irrigation plan" : "Zone irrigation queued"}
+                    </p>
+                    <p className="mt-1 text-slate-700">
+                      {globalQueueTargets.length > 0
+                        ? `Pump will irrigate ${globalQueueTargets.length} zone${globalQueueTargets.length === 1 ? "" : "s"}: ${globalQueueTargets.join(", ")}.`
+                        : `Pump will irrigate: ${queuedWaterZoneIds.join(", ")}.`}
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="mt-3 border-violet-300 text-violet-800 hover:bg-violet-100"
+                      disabled={isClearingIrrigationQueue}
+                      onClick={clearIrrigationQueue}
+                    >
+                      {isClearingIrrigationQueue ? "Clearing…" : "Clear irrigation queue"}
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="rounded-lg border border-dashed border-violet-200 bg-white/70 p-3 text-slate-600">
+                    No irrigation commands are waiting.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
 
             {/* Irrigate Now — visually distinct (blue) from the Kill Switch (red) so the two actions are never confused */}
             <Card className="border-blue-200 bg-blue-50/40 shadow-sm">
@@ -1407,6 +1558,15 @@ export default function FarmMap() {
               ? t("map.briefing.watch")
               : t("map.briefing.stable", { moisture })
           const moistureTone = moisture < dry ? "#f87171" : moisture < target ? "#fbbf24" : "#34d399"
+          const irrigateNow = Boolean(selectedZone.decisions?.irrigation.allowsStart)
+          const canSprayNow = Boolean(displayClimate.isLive && selectedZone.decisions?.spray.allowed)
+          const sprayVpdHint = !displayClimate.isLive
+            ? "Fresh VPD sensor reading needed"
+            : canSprayNow
+              ? "VPD and weather are safe"
+              : displayClimate.vpdBand !== "green"
+                ? "Wait for a better VPD"
+                : "Wait for safer weather"
           return (
             <div
               className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-md"
@@ -1419,14 +1579,16 @@ export default function FarmMap() {
                 {/* Priority accent rail */}
                 <div className="h-1 w-full" style={{ background: `linear-gradient(90deg, rgba(${accent}/0.9), rgba(${accent}/0.2))` }} />
 
-                <div className="p-6 sm:p-7">
+                <div className="p-5 sm:p-6">
                   {/* Header */}
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
                       <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-white/45">
                         {t("map.actionBriefing", { zone: getZoneLabel(selectedZone.id) })}
                       </p>
-                      <h3 className="text-gradient-brand mt-1 text-2xl font-black leading-tight">{rec.actionLabel}</h3>
+                      <h3 className="text-gradient-brand mt-1 text-2xl font-black leading-tight">
+                        {irrigateNow ? `Irrigate ${getZoneLabel(selectedZone.id)} now` : rec.actionLabel}
+                      </h3>
                     </div>
                     <span
                       className="shrink-0 rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-white"
@@ -1439,9 +1601,23 @@ export default function FarmMap() {
                   {/* Farmer-language verdict */}
                   <p className="mt-3 text-sm leading-relaxed text-white/70">{briefing}</p>
 
+                  <div className={`mt-3 flex items-center gap-2.5 rounded-xl border p-3 ${irrigateNow ? "border-blue-300/40 bg-blue-500/20" : "border-amber-300/30 bg-amber-500/10"}`}>
+                    <Droplets className={`h-5 w-5 shrink-0 ${irrigateNow ? "text-blue-300" : "text-amber-200"}`} />
+                    <div>
+                      <p className="text-base font-black leading-tight text-white">
+                        {irrigateNow ? "IRRIGATE NOW" : "DO NOT IRRIGATE NOW"}
+                      </p>
+                      <p className="mt-0.5 text-xs text-white/75">
+                        {irrigateNow
+                          ? `Start ${rec.pulseCount} short water pulse${rec.pulseCount === 1 ? "" : "s"} for ${getZoneLabel(selectedZone.id)}.`
+                          : selectedZone.decisions?.irrigation.reason || "Soil moisture is currently adequate."}
+                      </p>
+                    </div>
+                  </div>
+
                   {/* Metric tiles */}
-                  <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                    <div className="glass rounded-2xl p-3.5">
+                  <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+                    <div className="glass rounded-2xl p-3">
                       <p className="text-[10px] font-semibold uppercase tracking-widest text-white/45">{t("map.soilMoistureLabel")}</p>
                       <p className="mt-1 text-xl font-black text-white">
                         {moisture}<span className="text-sm font-semibold text-white/50">%</span>
@@ -1452,7 +1628,7 @@ export default function FarmMap() {
                       <p className="mt-1.5 text-[10px] text-white/40">Target {target}%</p>
                     </div>
 
-                    <div className="glass rounded-2xl p-3.5">
+                    <div className="glass rounded-2xl p-3">
                       <p className="text-[10px] font-semibold uppercase tracking-widest text-white/45">{t("map.pumpPlan")}</p>
                       <p className="mt-1 text-xl font-black text-white">
                         {rec.pulseCount > 0 ? rec.pulseCount : selectedZoneHasPrototypePump ? "—" : "N/A"}
@@ -1467,8 +1643,21 @@ export default function FarmMap() {
                       </p>
                     </div>
 
+                    <div className="glass rounded-2xl p-3">
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-white/45">Spray check</p>
+                      <p className={`mt-1 text-lg font-black leading-tight ${canSprayNow ? "text-emerald-300" : "text-rose-300"}`}>
+                        {canSprayNow ? "SPRAY NOW" : "DO NOT SPRAY"}
+                      </p>
+                      <p className="mt-1.5 text-[11px] font-medium text-white/65">
+                        {sprayVpdHint}
+                      </p>
+                      <p className="mt-1 text-[9px] text-white/35">
+                        VPD {displayClimate.vpd.toFixed(2)} kPa · ideal 0.8–1.2
+                      </p>
+                    </div>
+
                     {leverage > 0 ? (
-                      <div className="glass rounded-2xl p-3.5">
+                      <div className="glass rounded-2xl p-3">
                         <p className="text-[10px] font-semibold uppercase tracking-widest text-white/45">{t("map.spreadLeverage")}</p>
                         <p className="mt-1 text-xl font-black text-white">
                           ~{leverage.toFixed(1)}<span className="text-sm font-semibold text-white/50"> inf.</span>
@@ -1476,13 +1665,13 @@ export default function FarmMap() {
                         <p className="mt-1.5 text-[10px] text-white/40">{t("map.avoidedModel")}</p>
                       </div>
                     ) : read ? (
-                      <div className="glass rounded-2xl p-3.5">
+                      <div className="glass rounded-2xl p-3">
                         <p className="text-[10px] font-semibold uppercase tracking-widest text-white/45">{t("map.diagnosis")}</p>
                         <p className="mt-1 text-sm font-bold leading-tight text-white">{selectedZone.disease}</p>
                         <p className="mt-1.5 text-[10px] text-white/40">{read.confidenceLabel}</p>
                       </div>
                     ) : (
-                      <div className="glass rounded-2xl p-3.5">
+                      <div className="glass rounded-2xl p-3">
                         <p className="text-[10px] font-semibold uppercase tracking-widest text-white/45">{t("map.gridPump")}</p>
                         <p className="mt-1 text-sm font-bold capitalize leading-tight text-white">
                           {(selectedZone.gridColor || "green")} · {(selectedZone.pumpStatus || "off")}
@@ -1493,10 +1682,10 @@ export default function FarmMap() {
                   </div>
 
                   {/* Why this call */}
-                  <div className="glass mt-4 rounded-2xl p-4">
+                  <div className="glass mt-3 rounded-2xl p-3">
                     <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/45">{t("map.whyThisCall")}</p>
-                    <ul className="mt-2.5 space-y-2 text-sm text-white/75">
-                      {rec.reasons.map((reason) => (
+                    <ul className="mt-2 space-y-1.5 text-xs text-white/75">
+                      {rec.reasons.slice(0, 2).map((reason) => (
                         <li key={reason} className="flex gap-2.5">
                           <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: `rgb(${accent})` }} />
                           <span className="leading-snug">{reason}</span>
@@ -1506,7 +1695,7 @@ export default function FarmMap() {
                   </div>
 
                   {/* Actions */}
-                  <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                  <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                     <Button
                       variant="ghost"
                       className="text-white/70 hover:bg-white/10 hover:text-white"
@@ -1533,7 +1722,16 @@ export default function FarmMap() {
                         Open spray plan
                       </Button>
                     )}
+                    <Button
+                      className="bg-blue-600 text-white hover:bg-blue-700"
+                      disabled={isHydrating || !selectedZoneHasPrototypePump || !selectedZone.decisions?.irrigation.allowsStart}
+                      onClick={startSelectedZoneIrrigation}
+                    >
+                      <Droplets className="mr-2 h-4 w-4" />
+                      {isHydrating ? t("map.startingLoop") : t("map.irrigateNow")}
+                    </Button>
                   </div>
+                  {controlNotice && <p className="mt-3 text-right text-xs text-white/65">{controlNotice}</p>}
                 </div>
               </div>
             </div>
@@ -1620,10 +1818,21 @@ export default function FarmMap() {
                           {displayClimate.vpd.toFixed(2)} kPa ({displayClimate.vpdBand})
                         </div>
                         <div className="mt-1 text-[10px] text-slate-500">
-                          {getFarmVpdStatus(displayClimate)}
+                          Optimal for spraying: 0.8–1.2 kPa · {getFarmVpdStatus(displayClimate)}
                         </div>
                       </div>
                     </div>
+
+                    {(() => {
+                      const guidance = getFarmerSprayGuidance(selectedZone.decisions?.spray, displayClimate, farmWeather)
+                      return (
+                        <div className={`rounded-lg border p-3 text-xs ${guidance.tone}`}>
+                          <p className="font-bold">Spray guidance: {guidance.title}</p>
+                          <p className="mt-1">{guidance.action}</p>
+                          <p className="mt-1.5 font-medium">{guidance.timing}</p>
+                        </div>
+                      )
+                    })()}
 
                     {selectedZone.sensorError && (
                       <p className="text-xs font-semibold text-red-600">
@@ -1631,13 +1840,21 @@ export default function FarmMap() {
                       </p>
                     )}
 
-                    {!selectedZone.decisions?.spray.allowed && (
-                      <p className="text-xs font-medium text-amber-700">{selectedZone.decisions?.spray.reason || t("map.sprayConditionsAssessed")}</p>
-                    )}
-
-                    <div className="rounded-lg border border-sky-100 bg-sky-50/60 p-3 text-xs text-slate-700">
-                      <p className="font-bold text-sky-900">Irrigation decision: {getIrrigationActionLabel(selectedZone.decisions?.irrigation)}</p>
-                      <p className="mt-1">{selectedZone.decisions?.irrigation.reason || t("map.waitingWeatherDecision")}</p>
+                    <div
+                      className={`rounded-xl border-2 p-4 shadow-sm ${selectedZone.decisions?.irrigation.allowsStart
+                        ? "border-blue-400 bg-gradient-to-r from-blue-600 to-cyan-600 text-white"
+                        : "border-amber-300 bg-amber-50 text-amber-950"
+                        }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Droplets className="h-5 w-5 shrink-0" />
+                        <p className="text-lg font-black leading-tight">
+                          Irrigation decision: {getIrrigationActionLabel(selectedZone.decisions?.irrigation)}
+                        </p>
+                      </div>
+                      <p className="mt-2 text-sm font-medium leading-relaxed opacity-95">
+                        {selectedZone.decisions?.irrigation.reason || t("map.waitingWeatherDecision")}
+                      </p>
                     </div>
 
                     <div className="flex items-center gap-3">
@@ -1733,34 +1950,6 @@ export default function FarmMap() {
 
                   <Separator />
 
-                  {/* Hardware Queue */}
-                  {commandQueue[selectedZone.id] && commandQueue[selectedZone.id].length > 0 && (
-                    <div className="space-y-3 pb-2 pt-1">
-                      <div className="flex items-center justify-between">
-                        <h4 className="text-xs font-black uppercase tracking-widest text-blue-700 flex items-center gap-2">
-                          <div className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
-                          Hardware Queue
-                        </h4>
-                        <Badge variant="outline" className="text-[10px] font-bold border-blue-200 text-blue-700">
-                          {commandQueue[selectedZone.id].length} PENDING
-                        </Badge>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {commandQueue[selectedZone.id].map((cmd, i) => (
-                          <div
-                            key={i}
-                            className={`text-[9px] font-black uppercase px-2 py-1 rounded-md border shadow-sm transition-all duration-300 ${cmd === "spray" ? "bg-green-50 text-green-700 border-green-200" : "bg-blue-50 text-blue-700 border-blue-200"
-                              } translate-y-0 hover:-translate-y-0.5`}
-                          >
-                            {i + 1}. {cmd === "spray" ? t("map.activateSprayer") : cmd === "stop" ? t("map.stopPump") : t("map.pulseWaterPump")}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <Separator />
-
                   {/* Actions */}
                   <div className="space-y-2">
                     <Button
@@ -1773,35 +1962,7 @@ export default function FarmMap() {
                       variant={!selectedZoneHasPrototypePump ? "outline" : "default"}
                       size="sm"
                       disabled={isHydrating || !selectedZoneHasPrototypePump || !selectedZone.decisions?.irrigation.allowsStart}
-                      onClick={async () => {
-                        if (!selectedZone || !selectedZoneHasPrototypePump || !selectedZonePulsePlan || !selectedZone.decisions?.irrigation.allowsStart) return
-
-                        const confirmed = window.confirm(
-                          `Start a bounded irrigation loop on ${getZoneLabel(selectedZone.id)}?\n\n${irrigationLoopSubtext}\n\nThe controller fires 3-second pulses, checks the soil after each one, and stops itself when the zone reaches target — or after ${MAX_IRRIGATION_PULSES} pulses if the sensor stalls. You can cancel anytime.`
-                        )
-
-                        if (!confirmed) return
-
-                        setIsHydrating(true)
-                        setControlNotice(null)
-
-                        try {
-                          const response = await fetch("/api/hydrate", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ zoneId: selectedZone.id, pulses: selectedZonePulsePlan.pulses }),
-                          })
-                          const result = await response.json().catch(() => ({}))
-                          if (!response.ok) {
-                            setControlNotice(result?.message || t("map.pulsesCouldNotQueue"))
-                          } else {
-                            setControlNotice(result?.message || t("map.pulsePlanQueued"))
-                          }
-                          await fetchZones()
-                        } finally {
-                          setIsHydrating(false)
-                        }
-                      }}
+                      onClick={startSelectedZoneIrrigation}
                     >
                       <Droplets className="mr-2 h-4 w-4" />
                       {isHydrating

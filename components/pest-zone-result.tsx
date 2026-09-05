@@ -5,6 +5,7 @@ import { Camera, CheckCircle2, Clock3, FlaskConical, History, ImageOff, Loader2,
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { usePestText } from "@/components/pest-zone-copy"
+import { localeFor } from "@/lib/language-context"
 import { zoneState, zoneTrend, type PestZoneObservation, type PestZoneState, type PestZoneTrend } from "@/lib/pest-zone-types"
 
 export const zoneLabels: Record<PestZoneState, string> = {
@@ -43,7 +44,7 @@ export function PestZoneResult({ observation, observations, onRetake, onView, on
   const trend = zoneTrend(observation, observations)
   const state = zoneState(observation)
   const latest = observations[0]?.id === observation.id
-  const date = (value: string) => new Date(value).toLocaleString(language === "hi" ? "hi-IN" : "en-IN", { dateStyle: "medium", timeStyle: "short" })
+  const date = (value: string) => new Date(value).toLocaleString(localeFor(language), { dateStyle: "medium", timeStyle: "short" })
   const advice = result.advice
 
   const speak = () => {
@@ -51,7 +52,7 @@ export function PestZoneResult({ observation, observations, onRetake, onView, on
     const words = [result.summary?.primaryPestName || "Needs recheck", ...(advice?.inspectToday || []), ...(advice?.next48Hours || [])].map(text).join(". ")
     window.speechSynthesis.cancel()
     const utterance = new SpeechSynthesisUtterance(words)
-    utterance.lang = language === "hi" ? "hi-IN" : "en-IN"
+    utterance.lang = localeFor(language)
     window.speechSynthesis.speak(utterance)
   }
 

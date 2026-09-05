@@ -8,6 +8,9 @@ import { Globe, Check, ChevronDown } from "lucide-react"
 const languages: { code: Language; label: string; native: string }[] = [
   { code: "en", label: "English", native: "English" },
   { code: "hi", label: "Hindi", native: "हिंदी" },
+  { code: "mr", label: "Marathi", native: "मराठी" },
+  { code: "ta", label: "Tamil", native: "தமிழ்" },
+  { code: "te", label: "Telugu", native: "తెలుగు" },
 ]
 
 /**
@@ -65,7 +68,7 @@ export default function LanguageSelector({
           }`}
         >
           <div className="px-4 pt-3 pb-2 text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400">
-            {language === "hi" ? "भाषा चुनें" : "Choose language"}
+            {t("language.choose")}
           </div>
           <div className="pb-2">
             {languages.map((lang) => {
