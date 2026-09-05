@@ -13,6 +13,7 @@
     "test": "node scripts/check-translations.mjs && node scripts/check-ui-regressions.mjs && tsc --noEmit"
   },
   "dependencies": {
+    "@google/genai": "^2.21.0",
     "@hookform/resolvers": "^3.10.0",
     "@radix-ui/react-accordion": "1.2.2",
     "@radix-ui/react-alert-dialog": "1.1.4",

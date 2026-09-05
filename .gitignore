@@ -41,3 +41,4 @@ frontend*.log
 
 # Private photos retained for local pest-zone history.
 /app/data/pest-photos/
+/app/data/leaf-photos/

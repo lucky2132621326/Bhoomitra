@@ -1,8 +1,17 @@
 import { NextResponse } from "next/server"
-import { zones, recordActivity } from "../zones/data"
+import { zones, recordActivity, getFarmClimate } from "../zones/data"
 import { DetectionEvent } from "../zones/types"
 import { calculateSeverity, getTreatmentOptions, normalizeDiseaseLabel } from "@/app/lib/mlProcessor"
 import { readDB, writeDB } from "@/app/lib/database"
+import { saveLeafPhoto } from "@/app/lib/leafPhotos"
+import { getForecast } from "@/app/lib/weatherService"
+import {
+  isGeminiConfigured,
+  isInternetAvailable,
+  requestGeminiDetectionAnalysis,
+  type GeminiAnalysisSource,
+  type GeminiDetectionAnalysis,
+} from "@/app/lib/llmRecommendationEngine"
 
 const ML_SERVICE_URL = process.env.ML_SERVICE_URL ?? "http://127.0.0.1:5000"
 
@@ -74,6 +83,18 @@ export async function POST(req: Request) {
 
     const mlResult = await flaskRes.json()
 
+    // Best-effort: keep the original leaf photo so the LLM-enhanced
+    // recommendation path can attach it as evidence later. Never fails the
+    // detection if the format is unsupported or the disk write fails.
+    let photoBytes: Buffer | null = null
+    let photoName: string | null = null
+    try {
+      photoBytes = Buffer.from(await file.arrayBuffer())
+      photoName = saveLeafPhoto(photoBytes)
+    } catch {
+      photoName = null
+    }
+
     const disease = mlResult?.disease ?? "Unknown"
     const canonicalDisease = mlResult?.canonicalDisease ?? mlResult?.englishDisease ?? disease
     const confidence = mlResult?.confidence ?? 0
@@ -131,6 +152,60 @@ export async function POST(req: Request) {
           }
         : null
 
+    // 🔥 Online Gemini analysis — enhancement only, never authoritative.
+    // Offline (no internet / no GEMINI_API_KEY): Gemini is never called and
+    // never awaited — analysisSource stays "ml-offline" and the response is
+    // otherwise identical to before this feature existed. Online: only
+    // attempted for a conclusive, confirmed, non-healthy diagnosis (nothing
+    // useful to enhance for a review-required, low-confidence, or healthy
+    // result). Any failure/timeout/invalid response leaves analysisSource at
+    // "ml-fallback" and geminiAnalysis at null — the ML detection + offline
+    // recommendation above are already complete and are returned unchanged.
+    const canAnalyze = !needsCropConfirmation && !isLowConfidencePrediction && !isHealthyPrediction
+    const online = canAnalyze && isGeminiConfigured() && (await isInternetAvailable())
+    let analysisSource: GeminiAnalysisSource = "ml-offline"
+    let geminiAnalysis: GeminiDetectionAnalysis | null = null
+
+    if (online) {
+      analysisSource = "ml-fallback"
+      try {
+        const [weather, climate] = [await getForecast(), getFarmClimate()]
+        const geminiResult = await requestGeminiDetectionAnalysis({
+          kind: "disease",
+          zoneId,
+          crop: crop || modelCrop || "the crop",
+          mlLabel: disease,
+          mlConfidencePct: Math.round((Number(confidence) || 0) * 100),
+          severity: level,
+          mlTreatmentSummary: primaryRecommendation
+            ? `${primaryRecommendation.activeIngredient} ${primaryRecommendation.formulation || ""}`.trim()
+            : undefined,
+          mlDosage: primaryRecommendation?.dosage,
+          mlOrganicAlternative: primaryRecommendation?.organicAlternative,
+          soilMoisturePct: zone.soilMoisture ?? null,
+          temperatureC: climate.fresh ? climate.temperature : null,
+          humidityPct: climate.fresh ? climate.humidity : null,
+          vpdKpa: climate.fresh ? climate.vpd : null,
+          vpdBand: climate.fresh ? climate.vpdBand : null,
+          weatherDescription: weather.current?.description ?? null,
+          windSpeedKmh: weather.current?.windSpeed ?? null,
+          windDirectionDeg: weather.current?.windDirection ?? null,
+          nextRainHours: weather.derived?.nextRainHours ?? null,
+          totalRain24hMm: weather.derived?.totalRain24h ?? null,
+          fungalPressureBand: weather.derived?.fungalPressure?.band ?? null,
+          sprayWindowSafeNow: weather.derived?.sprayWindow?.safeNow ?? null,
+          photo: photoBytes ? { base64: photoBytes.toString("base64"), mimeType: file.type || "image/jpeg" } : null,
+        })
+        if (geminiResult.ok) {
+          geminiAnalysis = geminiResult.data
+          analysisSource = "gemini"
+        }
+      } catch {
+        // Stays "ml-fallback" — the ML detection/recommendation already built
+        // above is complete and is returned exactly as if this block never ran.
+      }
+    }
+
     // 🔥 Create detection object
     const newDetection: DetectionEvent = {
       id: crypto.randomUUID(),
@@ -161,7 +236,7 @@ export async function POST(req: Request) {
       cropMatch,
       modelId: selectedModelId,
       modelVersion: selectedModelVersion,
-
+      photoName,
     }
 
     // 🔥 READ DB
@@ -227,6 +302,11 @@ export async function POST(req: Request) {
         : treatments.notice,
       modelId: selectedModelId,
       modelVersion: selectedModelVersion,
+      // Online-enhancement result. "geminiAnalysis" is only ever populated
+      // when analysisSource === "gemini"; the ML detection/recommendation
+      // above are unaffected either way — see comment at the Gemini call.
+      analysisSource,
+      geminiAnalysis,
     })
 
   } catch (err) {

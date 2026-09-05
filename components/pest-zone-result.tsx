@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge"
 import { usePestText } from "@/components/pest-zone-copy"
 import { localeFor } from "@/lib/language-context"
 import { zoneState, zoneTrend, type PestZoneObservation, type PestZoneState, type PestZoneTrend } from "@/lib/pest-zone-types"
+import { AiSourceBadge } from "@/components/ai-source-badge"
+import { GeminiAnalysisPanel } from "@/components/gemini-analysis-panel"
 
 export const zoneLabels: Record<PestZoneState, string> = {
   unmeasured: "Pressure unknown",
@@ -58,7 +60,7 @@ export function PestZoneResult({ observation, observations, onRetake, onView, on
 
   return <div className="space-y-6 text-base">
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <div className="flex flex-wrap items-center gap-2"><Badge variant="outline">{text(latest ? "Latest test" : "Earlier test")}</Badge><Badge variant="outline">{text(result.scan.crop)}</Badge><time className="text-sm text-slate-600" dateTime={result.scan.timestamp}>{date(result.scan.timestamp)}</time></div>
+      <div className="flex flex-wrap items-center gap-2"><Badge variant="outline">{text(latest ? "Latest test" : "Earlier test")}</Badge><Badge variant="outline">{text(result.scan.crop)}</Badge><time className="text-sm text-slate-600" dateTime={result.scan.timestamp}>{date(result.scan.timestamp)}</time>{result.detected && <AiSourceBadge source={result.analysisSource} />}</div>
       <Button onClick={onRetake} className="h-11 rounded-xl bg-green-700 text-base hover:bg-green-800"><Camera className="mr-2 h-5 w-5" />{text("Check this zone again")}</Button>
     </div>
 
@@ -130,6 +132,13 @@ export function PestZoneResult({ observation, observations, onRetake, onView, on
         <p className="mt-5 rounded-2xl bg-slate-900 p-5 leading-7 text-white"><strong>{text("Safety:")}</strong> {text(advice.pesticide.safety)} {text(advice.pesticide.resistanceNote)} <strong>{text("Pre-harvest interval:")}</strong> {text(advice.pesticide.preHarvestInterval)}</p>
       </section>
     </>}
+
+    {/* Gemini analysis is purely additive: the ML pest ID and knowledge-base
+        advice above are already complete on their own — this only appears
+        when the online call actually succeeded and validated. */}
+    {result.analysisSource === "gemini" && result.geminiAnalysis && (
+      <GeminiAnalysisPanel analysis={result.geminiAnalysis} />
+    )}
 
     <section className="rounded-3xl border border-slate-200 bg-white p-5 sm:p-6">
       <h3 className="flex items-center gap-3 text-2xl font-bold"><History className="text-green-700" />{text("Zone test history")}</h3><p className="mt-2 text-slate-600">{text("Open any test to view its saved result.")}</p>

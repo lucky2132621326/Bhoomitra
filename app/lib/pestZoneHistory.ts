@@ -50,6 +50,7 @@ export function attachPestSnapshot(recordId: string, observationId: string, resu
     predictions: result.predictions, detections: result.detections, pressure: result.pressure,
     classificationLimit: typeof result.classificationLimit === "string" ? result.classificationLimit : "Counts and pressure describe this photo only, not the whole zone.",
     message: result.message, pest: result.pest, advice: result.advice,
+    analysisSource: result.analysisSource, geminiAnalysis: result.geminiAnalysis ?? null,
   }
   entry.snapshot = { result: snapshotResult, photoName }
   writeDB(db)

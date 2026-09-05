@@ -1,8 +1,16 @@
 import { NextResponse } from "next/server"
-import { zones } from "@/app/api/zones/data"
+import { zones, getFarmClimate } from "@/app/api/zones/data"
 import { cropIsSupported, getPestKnowledge } from "@/app/data/pestKnowledge"
 import { photoExtension, savePestPhoto } from "@/app/lib/pestPhotos"
 import { attachPestSnapshot } from "@/app/lib/pestZoneHistory"
+import { getForecast } from "@/app/lib/weatherService"
+import {
+  isGeminiConfigured,
+  isInternetAvailable,
+  requestGeminiDetectionAnalysis,
+  type GeminiAnalysisSource,
+  type GeminiDetectionAnalysis,
+} from "@/app/lib/llmRecommendationEngine"
 import {
   confidenceBand,
   findPestRecord,
@@ -286,10 +294,63 @@ export async function POST(request: Request) {
         ? `The ${primaryKnowledge.commonName} guide is not verified for ${crop}. Confirm with local extension.`
         : null
 
+    // Online Gemini analysis — enhancement only, mirrors the Disease
+    // Detection contract exactly. Offline (no internet / no GEMINI_API_KEY):
+    // never called, analysisSource stays "ml-offline". Online: called for
+    // any confident primary prediction (this branch only runs when one
+    // exists); any failure/timeout/invalid response leaves analysisSource at
+    // "ml-fallback" — the ML pest ID + knowledge-base advice below (`advice`)
+    // is already complete and is returned unchanged either way.
+    const online = isGeminiConfigured() && (await isInternetAvailable())
+    let analysisSource: GeminiAnalysisSource = "ml-offline"
+    let geminiAnalysis: GeminiDetectionAnalysis | null = null
+
+    if (online) {
+      analysisSource = "ml-fallback"
+      try {
+        const zoneForClimate = zones.find((z) => z.id === zoneId)
+        const [weather, climate] = [await getForecast(), getFarmClimate()]
+        const geminiResult = await requestGeminiDetectionAnalysis({
+          kind: "pest",
+          zoneId,
+          crop,
+          mlLabel: primaryKnowledge.commonName,
+          mlConfidencePct: Math.round(confidence * 100),
+          severity: pressureLevel,
+          // Never hand Gemini a chemical the safety gate has not cleared.
+          mlTreatmentSummary: chemicalBlockedReason ? undefined : primaryKnowledge.chemical.product,
+          mlDosage: chemicalBlockedReason ? undefined : primaryKnowledge.chemical.labelRate,
+          mlOrganicAlternative: primaryKnowledge.biologicalControl?.[0],
+          soilMoisturePct: zoneForClimate?.soilMoisture ?? null,
+          temperatureC: climate.fresh ? climate.temperature : null,
+          humidityPct: climate.fresh ? climate.humidity : null,
+          vpdKpa: climate.fresh ? climate.vpd : null,
+          vpdBand: climate.fresh ? climate.vpdBand : null,
+          weatherDescription: weather.current?.description ?? null,
+          windSpeedKmh: weather.current?.windSpeed ?? null,
+          windDirectionDeg: weather.current?.windDirection ?? null,
+          nextRainHours: weather.derived?.nextRainHours ?? null,
+          totalRain24hMm: weather.derived?.totalRain24h ?? null,
+          fungalPressureBand: weather.derived?.fungalPressure?.band ?? null,
+          sprayWindowSafeNow: weather.derived?.sprayWindow?.safeNow ?? null,
+          photo: { base64: photoBytes.toString("base64"), mimeType: file.type || "image/jpeg" },
+        })
+        if (geminiResult.ok) {
+          geminiAnalysis = geminiResult.data
+          analysisSource = "gemini"
+        }
+      } catch {
+        // Stays "ml-fallback" — the ML pest ID + knowledge-base advice built
+        // above is complete and is returned exactly as if this block never ran.
+      }
+    }
+
     const result = {
       success: true,
       detected: true,
       identificationSource: classifierOnly ? "classifier" as const : "detector" as const,
+      analysisSource,
+      geminiAnalysis,
       persisted: true,
       model: modelDetails,
       inference,
