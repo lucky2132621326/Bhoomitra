@@ -35,6 +35,7 @@ function FeatureCard({
   href,
   accent,
   delay,
+  onOpen,
 }: {
   icon: any
   title: string
@@ -42,10 +43,12 @@ function FeatureCard({
   href: string
   accent: string
   delay: string
+  onOpen?: (event: React.MouseEvent<HTMLAnchorElement>) => void
 }) {
   return (
     <a
       href={href}
+      onClick={onOpen}
       className="group relative flex flex-col gap-4 p-6 rounded-2xl border border-[#d4e9c8] bg-white shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden animate-fade-in-up"
       style={{ animationDelay: delay }}
     >
@@ -192,7 +195,8 @@ export default function HomePage() {
     }
   }
 
-  const handleOpenDetection = async () => {
+  const handleOpenFeature = async (href: string, event?: React.MouseEvent<HTMLAnchorElement>) => {
+    event?.preventDefault()
     if (launchingDashboard) return
 
     setLaunchingDashboard(true)
@@ -200,7 +204,7 @@ export default function HomePage() {
       const response = await fetch("/api/auth/unlock-dashboard", { method: "POST" })
       if (!response.ok) throw new Error("Failed to unlock dashboard")
 
-      router.push("/dashboard/detection")
+      router.push(href)
       router.refresh()
     } catch {
       router.push("/login")
@@ -208,6 +212,8 @@ export default function HomePage() {
       setLaunchingDashboard(false)
     }
   }
+
+  const handleOpenDetection = () => handleOpenFeature("/dashboard/detection")
 
   return (
     <div className="w-full font-sans">
@@ -304,7 +310,12 @@ export default function HomePage() {
 
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {features.map((f, i) => (
-            <FeatureCard key={f.href} {...f} delay={`${i * 0.07}s`} />
+            <FeatureCard
+              key={f.href}
+              {...f}
+              delay={`${i * 0.07}s`}
+              onOpen={(event) => handleOpenFeature(f.href, event)}
+            />
           ))}
         </div>
       </section>
